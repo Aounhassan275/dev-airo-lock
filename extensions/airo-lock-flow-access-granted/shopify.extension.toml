@@ -1,0 +1,46 @@
+api_version = "2025-10"
+
+[[extensions]]
+name = "Airo Access Lock & Control access granted"
+uid = "5113388e-9fd5-cbf2-c6b9-59737283d7d6107cd7e2"
+type = "flow_trigger"
+handle = "airo-lock-access-granted"
+description = "Fires when a customer successfully passes an Airo Access Lock & Control access rule."
+
+  [settings]
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "ruleId"
+    name = "Rule ID"
+    description = "Internal Airo Access Lock & Control rule id."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "lockId"
+    name = "Lock ID"
+    description = "Internal Airo Access Lock & Control lock id."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "resourceType"
+    name = "Resource type"
+    description = "Resource scope: product, collection, page, blog, shop, checkout."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "resourceHandle"
+    name = "Resource handle"
+    description = "Handle of the resource that was unlocked."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "email"
+    name = "Email"
+    description = "Customer email when known."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "country"
+    name = "Country"
+    description = "Detected ISO country code."

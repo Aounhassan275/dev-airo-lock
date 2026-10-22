@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create a widget &mdash; Airo Access Lock</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+    /* /widget/create and /widget/{widget}/edit — one page.
+     *
+     * The same screen the lock form is, for the same reason: a widget is a
+     * handful of settings you opened on purpose, and editing one is a form
+     * you opened to change a single colour in. It used to be a three-step
+     * modal, which put the colours — the only part anyone comes here for —
+     * two clicks behind a name field.
+     *
+     * The shell is "one page" in app.css, shared with the lock form. What is
+     * below is only what a widget has that a lock does not. */
+
+    /* The palettes, laid out for a column this wide rather than for a modal. */
+    .palettes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    @media (max-width: 1320px) { .palettes { grid-template-columns: minmax(0, 1fr); } }
+
+    /* Who is relying on this design. A widget is shared, so editing one edits
+       every lock that picked it, and the page has to say so before you do. */
+    .uses-l2 {
+        display: flex; align-items: center; gap: 8px; font-size: 12.5px;
+        padding: 10px 0; border-bottom: 1px solid var(--p-border-soft);
+    }
+    .uses-l2:last-child { border-bottom: 0; }
+    .uses-l2 a { font-weight: 600; color: var(--p-text); text-decoration: none; }
+    .uses-l2 a:hover { text-decoration: underline; }
+
+    /* The four colours, each a swatch you can open. */
+    #colours { display: flex; gap: 8px; flex-wrap: wrap; }
+</style>
+
+<main class="page full">
+
+    <div class="pg-head">
+        <div class="grow" style="min-width:0">
+            <a class="back-l" href="widgets.html">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M15 5l-7 7 7 7"></path></svg>
+                Widgets
+            </a>
+            <div class="row g8 wrap" style="margin-top:2px">
+                <h1 class="pg-t" id="pageTitle">Create a widget</h1>
+                <span class="tag form hide" id="kindTag">Form</span>
+                <span class="xs sub hide" id="usedTag">Used by 2 locks</span>
+            </div>
+        </div>
+        <div class="row g8 wrap">
+            <button class="btn hide" id="deleteWidget">Delete</button>
+            <a class="btn" href="widgets.html">Cancel</a>
+            <button class="btn primary" id="save" disabled>Create widget</button>
+        </div>
+    </div>
+
+    <div class="one">
+        <div class="one-main">
+
+            <!-- ================================================= 1. what -->
+            <section class="sec-c">
+                <div class="sec-hd">
+                    <span class="sec-n">1</span>
+                    <div class="grow">
+                        <h2 class="sec-t2">What it is</h2>
+                        <p class="sec-d2">A name you will recognise in a lock&rsquo;s design list, and
+                            whether the popup asks for anything.</p>
+                    </div>
+                </div>
+                <div class="sec-b">
+                    <div class="fields2">
+                        <div class="field">
+                            <label class="label" for="wName">Widget name <span class="req" aria-hidden="true">*</span></label>
+                            <input class="input" id="wName" aria-required="true" placeholder="e.g. Trade gate">
+                            <span class="help">Only you see this. It appears when a lock picks a
+                                design.</span>
+                        </div>
+                        <div class="field">
+                            <div class="between">
+                                <label class="label" for="wLang">Popup language</label>
+                                <button class="btn plain xs" id="wLangSync">
+                                    <span class="pick-sync">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M20 11a8 8 0 0 0-14-4.5L4 9"></path>
+                                            <path d="M4 13a8 8 0 0 0 14 4.5L20 15"></path>
+                                            <path d="M4 5v4h4M20 19v-4h-4"></path></svg>
+                                        Sync languages
+                                    </span>
+                                </button>
+                            </div>
+                            <select class="select" id="wLang">
+                                <option>Follow the storefront language (recommended)</option>
+                                <option>English</option><option>Deutsch</option>
+                                <option>Fran&ccedil;ais</option>
+                            </select>
+                            <span class="help" id="wLangNote">Shopify decides which languages your
+                                store publishes.</span>
+                        </div>
+                    </div>
+
+                    <div class="divider" style="margin:16px 0"></div>
+
+                    <span class="sec-l" style="display:block;margin-bottom:7px">Kind</span>
+                    <div class="opts2" id="kind">
+                        <button class="opt on" data-kind="form">
+                            <span class="opt-ic" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                                     stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="5" width="18" height="6" rx="1.6"></rect>
+                                    <rect x="3" y="15" width="11" height="4" rx="1.6"></rect></svg></span>
+                            <span><span class="opt-t">Form widget</span>
+                            <span class="opt-d">Asks for something. Passcode, paired credential and
+                                age conditions use this.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                        <button class="opt" data-kind="text">
+                            <span class="opt-ic" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                                     stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 6h16M4 11h16M4 16h9"></path></svg></span>
+                            <span><span class="opt-t">Text widget</span>
+                            <span class="opt-d">Says something. Tag, sign-in, email list, location and
+                                secret-link conditions use this.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =============================================== 2. colours -->
+            <section class="sec-c">
+                <div class="sec-hd">
+                    <span class="sec-n">2</span>
+                    <div class="grow">
+                        <h2 class="sec-t2">Colours</h2>
+                        <p class="sec-d2">Start from a palette, then change any of the four. The
+                            preview is the storefront popup, not an approximation of it.</p>
+                    </div>
+                </div>
+                <div class="sec-b">
+                    <div class="row g8" style="margin-bottom:9px">
+                        <span class="sec-l">Palettes</span><span class="tag">Basic</span>
+                    </div>
+                    <div class="palettes" id="palettes"></div>
+
+                    <div class="row g8" style="margin:16px 0 9px">
+                        <span class="sec-l">Colours</span>
+                        <span class="xs sub" id="palName">Classic Dark</span>
+                    </div>
+                    <div id="colours">
+                        <label class="swatch"><input type="color" data-k="text" value="#FFFFFF">
+                            <span>Text</span></label>
+                        <label class="swatch"><input type="color" data-k="card" value="#6B7280">
+                            <span>Card</span></label>
+                        <label class="swatch"><input type="color" data-k="buttonBg" value="#000000">
+                            <span>Button BG</span></label>
+                        <label class="swatch"><input type="color" data-k="buttonText" value="#FFFFFF">
+                            <span>Button text</span></label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================================================= 3. shape -->
+            <section class="sec-c">
+                <div class="sec-hd">
+                    <span class="sec-n">3</span>
+                    <div class="grow">
+                        <h2 class="sec-t2">Shape and wording</h2>
+                        <p class="sec-d2">How the card sits, and the one word the button carries.
+                            What the popup <em>says</em> stays with each lock.</p>
+                    </div>
+                </div>
+                <div class="sec-b">
+                    <div class="fields2">
+                        <div class="field">
+                            <label class="label" for="wPad">Card padding</label>
+                            <div class="row g8"><input class="input" id="wPad" value="10">
+                                <span class="sm sub">px</span></div>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="wRad">Card radius</label>
+                            <div class="row g8"><input class="input" id="wRad" value="12">
+                                <span class="sm sub">px</span></div>
+                        </div>
+                        <div class="field" id="btnTextWrap">
+                            <label class="label" for="wBtnText">Button text</label>
+                            <input class="input" id="wBtnText" placeholder="Unlock">
+                            <span class="help">Leave blank to use each lock&rsquo;s own wording.</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================== 4. used by -->
+            <section class="sec-c hide" id="secUses">
+                <div class="sec-hd">
+                    <span class="sec-n">4</span>
+                    <div class="grow">
+                        <h2 class="sec-t2">Locks using this design</h2>
+                        <p class="sec-d2">A widget is shared. Saving a colour here changes it on
+                            every lock below.</p>
+                    </div>
+                </div>
+                <div class="sec-b" id="usesBody"></div>
+            </section>
+        </div>
+
+        <!-- ----------------------------------------------------------- rail -->
+        <aside class="one-rail">
+            <div class="rail-c">
+                <div class="stage">
+                    <div class="device" data-preview-device>
+                        <div class="sk">
+                            <i style="width:46%;height:12px"></i><i class="gap"></i>
+                            <i></i><i style="width:88%"></i><i style="width:70%"></i><i class="gap"></i>
+                            <i style="width:40%;height:11px"></i><i></i><i style="width:80%"></i>
+                        </div>
+                        <div class="veil">
+                            <div class="lk" id="card3" style="background:#fff;color:#1a1a1a">
+                                <div class="lk-ico">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="1.8" stroke-linecap="round"><rect x="4" y="10.5" width="16" height="10" rx="2.5"></rect>
+                                    <path d="M8 10.5V7.5a4 4 0 018 0v3"></path></svg>
+                                </div>
+                                <div class="lk-t" id="t3">Members only</div>
+                                <div class="lk-m" id="m3">Access restricted.</div>
+                                <div id="f3"></div>
+                                <div class="lk-b" id="b3" style="background:#1a1a1a;color:#fff">Unlock</div>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="stage-cap">What shoppers see</span>
+                </div>
+
+                <ol class="osums">
+                    <li class="sum" id="sum1"><span class="sum-k">Kind</span>
+                        <span class="sum-v">Form widget</span></li>
+                    <li class="sum" id="sum2"><span class="sum-k">Palette</span>
+                        <span class="sum-v">Classic Dark</span></li>
+                    <li class="sum" id="sum3"><span class="sum-k">Used by</span>
+                        <span class="sum-v">No locks yet</span></li>
+                </ol>
+            </div>
+        </aside>
+    </div>
+
+    <div class="savebar" id="savebar">
+        <div class="grow" style="min-width:0">
+            <span class="sb-t">Unsaved changes</span>
+            <span class="sb-d" id="sbNeeds">Nothing is saved until you press Save.</span>
+        </div>
+        <a class="btn" href="widgets.html">Discard</a>
+        <button class="btn primary" id="saveBottom" disabled>Create widget</button>
+    </div>
+</main>
+
+<!-- ============================================================== delete === -->
+<div class="modal-bg hide" id="delModal">
+    <div class="modal" style="max-width:420px">
+        <div class="modal-head">
+            <span class="h-md">Delete this widget?</span>
+            <button class="btn plain" data-close="delModal" aria-label="Close">&#10005;</button>
+        </div>
+        <div style="padding:16px">
+            <p class="sm sub" id="delNote">Any lock using it falls back to the default look. The
+                locks themselves keep working.</p>
+        </div>
+        <div class="modal-foot">
+            <button class="btn" data-close="delModal">Cancel</button>
+            <a class="btn danger" href="widgets.html">Delete widget</a>
+        </div>
+    </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script src="assets/lock-form.js"></script>
+<script src="assets/widget-page.js"></script>
+</html>

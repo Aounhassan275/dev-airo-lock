@@ -1,0 +1,222 @@
+{% comment %} blocks/access-control.liquid - Global Access Control {% endcomment %}
+
+{% assign current_type = '' %}
+{% assign current_handle = '' %}
+
+{% if request.page_type == 'collection' and collection %}
+    {% assign current_type = 'collection' %}
+    {% assign current_handle = collection.handle %}
+{% elsif request.page_type == 'product' and product %}
+    {% assign current_type = 'product' %}
+    {% assign current_handle = product.handle %}
+{% elsif request.page_type == 'page' and page %}
+    {% assign current_type = 'page' %}
+    {% assign current_handle = page.handle %}
+{% elsif request.page_type == 'article' and article %}
+    {% assign current_type = 'blog' %}
+    {% assign current_handle = article.handle %}
+{% elsif request.page_type == 'blog' and blog %}
+    {% assign current_type = 'blog' %}
+    {% assign current_handle = blog.handle %}
+{% elsif request.page_type == 'index' %}
+    {% assign current_type = 'index' %}
+    {% assign current_handle = 'home' %}
+{% endif %}
+
+{% assign global_config = shop.metafields.access_lock.global_config.value %}
+{% assign local_rule = null %}
+{% assign inherited_from_collection = false %}
+{% assign shop_rule = shop.metafields.access_control.access_rule.value %}
+{% assign shop_lock_active = false %}
+
+{% if shop_rule %}
+    {% if shop_rule.locks %}
+        {% for l in shop_rule.locks %}
+            {% if l.enabled and l.target_type == 'shop' %}{% assign shop_lock_active = true %}{% endif %}
+        {% endfor %}
+    {% elsif shop_rule.enabled and shop_rule.target_type == 'shop' %}
+        {% assign shop_lock_active = true %}
+    {% endif %}
+{% endif %}
+
+{% if shop_lock_active %}
+    {% assign local_rule = shop_rule %}
+    {% assign current_type = 'shop' %}
+    {% assign current_handle = 'online_store' %}
+{% elsif request.page_type == 'product' and product %}
+    {% assign local_rule = product.metafields.access_control.access_rule.value %}
+    {% assign local_rule_raw = product.metafields.access_control.access_rule %}
+
+    {% comment %}
+      Collection-inherited locks: if THIS product has no enabled lock of its
+      own, but it belongs to a collection that's locked with "protect products"
+      turned on, apply that collection's lock to the product page too. This is
+      what stops customers reaching locked products via the catalog, search, or
+      a direct link. Opt-in: only collections with protect_products cascade.
+    {% endcomment %}
+    {% assign product_has_own_lock = false %}
+    {% if local_rule %}
+        {% if local_rule.locks %}
+            {% for l in local_rule.locks %}
+                {% if l.enabled %}{% assign product_has_own_lock = true %}{% endif %}
+            {% endfor %}
+        {% elsif local_rule.enabled != false %}
+            {% assign product_has_own_lock = true %}
+        {% endif %}
+    {% endif %}
+
+    {% unless product_has_own_lock %}
+        {% assign inherited_rule = null %}
+        {% for coll in product.collections %}
+            {% if inherited_rule == null %}
+                {% assign coll_rule = coll.metafields.access_control.access_rule.value %}
+                {% if coll_rule %}
+                    {% if coll_rule.locks %}
+                        {% for l in coll_rule.locks %}
+                            {% if l.enabled and l.settings.protect_products and inherited_rule == null %}
+                                {% assign inherited_rule = coll_rule %}
+                            {% endif %}
+                        {% endfor %}
+                    {% elsif coll_rule.enabled != false and coll_rule.settings.protect_products %}
+                        {% assign inherited_rule = coll_rule %}
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% if inherited_rule %}
+            {% assign local_rule = inherited_rule %}
+            {% assign inherited_from_collection = true %}
+        {% endif %}
+    {% endunless %}
+{% elsif request.page_type == 'collection' and collection %}
+    {% assign local_rule = collection.metafields.access_control.access_rule.value %}
+    {% assign local_rule_raw = collection.metafields.access_control.access_rule %}
+{% elsif request.page_type == 'page' and page %}
+    {% assign local_rule = page.metafields.access_control.access_rule.value %}
+    {% assign local_rule_raw = page.metafields.access_control.access_rule %}
+{% elsif request.page_type == 'article' and article %}
+    {% assign local_rule = article.metafields.access_control.access_rule.value %}
+    {% assign local_rule_raw = article.metafields.access_control.access_rule %}
+{% elsif request.page_type == 'blog' and blog %}
+    {% assign local_rule = blog.metafields.access_control.access_rule.value %}
+    {% assign local_rule_raw = blog.metafields.access_control.access_rule %}
+{% endif %}
+
+{% assign customer_logged_in = false %}
+{% if customer %}
+    {% assign customer_logged_in = true %}
+{% endif %}
+
+{% comment %}
+  SEO noindex: when an enabled rule applies to this resource and the merchant
+  has opted into seo_block, emit a noindex meta tag in the initial HTML so
+  Googlebot honors it. JS-injected noindex is not reliably respected.
+{% endcomment %}
+{% assign seo_block_active = false %}
+{% if local_rule %}
+    {% if local_rule.enabled != false and local_rule.seo_block %}
+        {% assign seo_block_active = true %}
+    {% elsif local_rule.settings.seo_block and local_rule.enabled != false %}
+        {% assign seo_block_active = true %}
+    {% endif %}
+{% endif %}
+{% if seo_block_active %}
+    <meta name='robots' content='noindex, nofollow'>
+{% endif %}
+
+{% comment %}
+  Performance: no-flash gate (5.8).
+
+  When an enabled rule applies to this resource, hide the body with CSS
+  before paint. The JS layer (access_ui.showContent) removes the gate
+  once it decides whether to allow content through or render the lock
+  prompt. We never hide content for shop-wide rules using hide-price or
+  hide-add-to-cart modes — those modes are designed to leave content visible.
+
+  Safety: a 2.5s timeout falls back to revealing content even if JS
+  fails to load (network failure, theme conflict). Better a brief flash
+  than a permanently blank page.
+{% endcomment %}
+{% assign needs_gate = false %}
+{% if local_rule and local_rule.enabled != false %}
+    {% unless local_rule.hide_price or local_rule.settings.hide_price or local_rule.hide_add_to_cart or local_rule.settings.hide_add_to_cart or local_rule.scope == 'variant' or local_rule.settings.scope == 'variant' %}
+        {% assign needs_gate = true %}
+    {% endunless %}
+{% endif %}
+{% if needs_gate %}
+    <style id='airo-lock-pre-gate'>
+        html.airo-lock-pending body { visibility: hidden !important; }
+        html.airo-lock-pending::before {
+            content: '';
+            position: fixed; inset: 0;
+            background: #fff;
+            z-index: 2147483646;
+        }
+    </style>
+    <script>
+        (function () {
+            var root = document.documentElement;
+            root.classList.add('airo-lock-pending');
+            setTimeout(function () { root.classList.remove('airo-lock-pending'); }, 2500);
+        })();
+    </script>
+{% endif %}
+
+{% if current_handle != '' %}
+    <div
+        id='access-control-init'
+        data-type='{{ current_type }}'
+        data-handle='{{ current_handle }}'
+        data-shop='{{ shop.permanent_domain }}'
+        data-customer-logged-in='{{ customer_logged_in }}'
+        data-customer-country='{{ localization.country.iso_code }}'
+        data-locale='{{ request.locale.iso_code }}'
+        data-global-config='{% if global_config %}{{ global_config | json | escape }}{% else %}{}{% endif %}'
+        data-local-rule='{% if local_rule %}{{ local_rule | json | escape }}{% else %}null{% endif %}'
+        data-inherited-collection='{{ inherited_from_collection }}'
+        data-rendered-at='{{ 'now' | date: '%s' }}'
+        {% if customer %}
+            data-customer-id='{{ customer.id }}'
+            data-customer-email='{{ customer.email }}'
+            data-customer-tags='{{ customer.tags | join: "," }}'
+        {% endif %}
+        style='display: none;'
+    ></div>
+{% endif %}
+
+<script src='{{ 'access_utils.js' | asset_url }}' defer='defer'></script>
+<script src='{{ 'access_i18n.js' | asset_url }}' defer='defer'></script>
+<script src='{{ 'access_a11y.js' | asset_url }}' defer='defer'></script>
+<script src='{{ 'access_validator.js' | asset_url }}' defer='defer'></script>
+<script src='{{ 'access_ui.js' | asset_url }}' defer='defer'></script>
+<script src='{{ 'access_variants.js' | asset_url }}' defer='defer'></script>
+<script src='{{ 'access_events.js' | asset_url }}' defer='defer'></script>
+<script src='{{ 'access_core.js' | asset_url }}' defer='defer'></script>
+{% comment %} Debug panel hidden in production — keep for future debugging
+<script src='{{ 'access_debug.js' | asset_url }}' defer='defer'></script>
+{% endcomment %}
+
+{% comment %} Keep specific resource scripts if they contain specialized logic not covered by core {% endcomment %}
+{% if request.page_type == 'product' %}
+    <script src='{{ 'access_product.js' | asset_url }}' defer='defer'></script>
+{% elsif request.page_type == 'collection' %}
+    <script src='{{ 'access_collection.js' | asset_url }}' defer='defer'></script>
+{% elsif request.page_type == 'page' or request.page_type == 'blog' or request.page_type == 'article' %}
+    <script src='{{ 'access_page.js' | asset_url }}' defer='defer'></script>
+{% endif %}
+
+<script src='{{ 'access_price.js' | asset_url }}' defer='defer'></script>
+{% comment %} Debug panel hidden in production — keep for future debugging
+<script src="{{ 'access_debug.js' | asset_url }}" defer></script>
+{% endcomment %}
+{% schema %}
+{
+    "name": "Theme App",
+    "target": "head",
+    "enabled_on": {
+        "templates": ["*"]
+    },
+    "settings": []
+}
+
+{% endschema %}

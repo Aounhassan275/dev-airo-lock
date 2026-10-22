@@ -1,0 +1,1635 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup &mdash; Airo Access Lock</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+    /* ---------------------------------------------------------------------
+       Setup carries every field the lock builder has, split across four steps
+       so each screen holds one decision's worth of work and nothing scrolls.
+
+       Step 1  what to lock, and what locking does
+       Step 2  who gets in — repeatable conditions, with bulk entry
+       Step 3  what visitors see — widget design and wording
+       Step 4  settings and schedule
+
+       The panel, stage, opt, tag and modal pieces come from the shared design
+       language in assets/app.css; only the step rows, the two-column field
+       grids and the condition cards are local.
+    --------------------------------------------------------------------- */
+    .page { height: 100%; display: flex; flex-direction: column; padding-bottom: 14px; }
+    .split { flex: 1; min-height: 0; }
+    .work, .work-body, .work-opts { min-height: 0; }
+    .work-body { align-items: stretch; overflow: hidden; padding-top: 12px; }
+    .work-head {
+        padding-top: 16px; padding-bottom: 11px; display: flex; align-items: flex-start;
+        justify-content: space-between; gap: 18px; flex-wrap: wrap;
+        border-bottom: 1px solid var(--p-border-soft);
+    }
+
+    /* The offer of a person. Quiet enough to ignore, close enough to the
+       heading to find when the step stops making sense. */
+    .helpnote {
+        display: flex; align-items: center; gap: 9px; flex: none; max-width: 270px;
+        padding: 7px 11px; border-radius: 10px; text-decoration: none;
+        border: 1px solid var(--p-border); background: #fcfcfc; color: var(--p-text);
+        transition: border-color .12s, background .12s;
+    }
+    .helpnote:hover { border-color: var(--accent); background: var(--v-50); }
+    /* Blue, not the brand ramp: this is the app offering a person, and the
+       ramp is ink in one of the two folders — grey on grey for the only thing
+       on the step that is not a control. */
+    .helpnote-ic {
+        width: 26px; height: 26px; border-radius: 7px; flex: none; display: grid;
+        place-items: center; background: var(--p-info-bg); color: var(--p-info-fg);
+    }
+    .helpnote-ic svg { width: 15px; height: 15px; }
+    .helpnote-t { display: block; font-size: 12px; font-weight: 650; line-height: 1.3; }
+    .helpnote-d { display: block; font-size: 11px; color: var(--p-text-sub); line-height: 1.3; }
+    .work-foot { margin-top: 12px; padding-top: 11px; padding-bottom: 11px; }
+    /* The actions stay right whether or not Back is beside them: on step 1
+       there is nothing to go back to, and space-between alone would put the
+       only child at the start. */
+    .work-foot > .row { margin-left: auto; }
+    /* The rule under the head does the separating the gap used to, so the
+       body keeps the height step 3 was tuned to rather than losing it. */
+    .work-body { padding-top: 7px; }
+    .work-opts { display: flex; flex-direction: column; overflow-y: auto; }
+    /* The stepper. Each step owns an equal share of the width, so the rules
+       between the circles line up however long the labels are. */
+    .stepper {
+        flex: none; padding: 10px 24px 12px; margin-bottom: 12px;
+        border: 1px solid var(--p-border-soft); border-radius: 16px; background: #fff;
+    }
+    .stepper ol { display: flex; margin: 0; padding: 0; list-style: none; }
+    .st {
+        flex: 1; position: relative; display: flex; flex-direction: column;
+        align-items: center; text-align: center; min-width: 0;
+    }
+    /* The rule runs from this circle to the next one. */
+    .st:not(:last-child)::after {
+        content: ''; position: absolute; top: 17px; height: 2px; border-radius: 2px;
+        left: calc(50% + 24px); right: calc(-50% + 24px); background: #e3e3e3;
+    }
+    .st.done::after { background: var(--accent); }
+    .st.on::after { background: var(--accent); }
+
+    .st-n {
+        width: 34px; height: 34px; border-radius: 50%; flex: none;
+        display: grid; place-items: center; font-size: 13px; font-weight: 700;
+        background: #ececec; color: #8a8a8a; position: relative; z-index: 1;
+    }
+    .st.on .st-n {
+        background: var(--accent); color: #fff;
+        box-shadow: 0 0 0 4px var(--accent-ring);
+    }
+    .st.done .st-n { background: var(--accent); color: #fff; }
+
+    .st-t {
+        font-size: 12.5px; font-weight: 550; color: var(--p-text-sub);
+        margin-top: 8px; padding: 0 6px; line-height: 1.25;
+    }
+    .st.on .st-t { color: var(--ink-1); font-weight: 650; }
+    .st.done .st-t { color: var(--p-text); }
+
+    /* Only the step you are on says so. */
+    .st-now { font-size: 10.5px; font-weight: 650; color: var(--accent-strong); margin-top: 2px;
+              visibility: hidden; }
+    .st.on .st-now { visibility: visible; }
+
+    /* Settings reads as a list of sections. A rule separates them, and the one
+       at the top of a column goes — which is what the two-column tiers need. */
+    /* Step 2 asks the checks and the terms, so it asks them across the card:
+       the conditions, then the two columns Settings already used. There is no
+       preview here — the step after this one is the preview. */
+    /* Two cards, not three bare columns: what has to be true, and what you
+       can change about it. */
+    /* The two cards are a pair, so they share a height: one short card beside
+       a full one left a third of the left column as void. */
+    [data-wiz="2"] .work-opts {
+        display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
+        gap: 0 32px; align-content: safe center; align-items: stretch;
+    }
+    /* The gap alone separated two boxes; without them the columns get a rule,
+       the way step 1 rules its form column off. */
+    [data-wiz="2"] .col-set {
+        border-left: 1px solid var(--p-border-soft); padding-left: 32px;
+        margin-left: -16px;
+    }
+    /* The list grows downwards into the room that buys, and the way to add
+       another sits under it rather than floating in the middle. */
+    [data-wiz="2"] #conds { flex: none; }
+    /* Two columns on the work surface, headed the way step 1 heads its own —
+       no panel, because no other step has one. */
+    .col-conds, .col-set { display: flex; flex-direction: column; min-width: 0; }
+    .col-h {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        margin-bottom: 8px; min-height: 26px; flex: none;
+    }
+    .set-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: 0 20px; align-items: start; }
+    /* Variant behaviour is the panel's first section and runs the full width
+       of it, so its two questions sit side by side without wrapping a label. */
+    [data-wiz="2"] .set-grid > #variantWrap {
+        grid-column: 1 / -1; padding-bottom: 14px; margin-bottom: 14px;
+        border-bottom: 1px solid var(--p-border-soft);
+    }
+    [data-wiz="2"] .col4 { display: flex; flex-direction: column; min-width: 0; }
+    [data-wiz="2"] .col4 > .sect:first-child,
+    [data-wiz="2"] .col4 > .sect:first-child.hide + .sect {
+        border-top: 0; margin-top: 0; padding-top: 0;
+    }
+    [data-wiz="2"] .fields2 { grid-template-columns: 1fr; gap: 10px; }
+    [data-wiz="2"] .field { max-width: none !important; }
+
+    @media (max-width: 1180px) {
+        [data-wiz="2"] .work-opts { grid-template-columns: 1fr; gap: 14px; }
+        /* Stacked, the rule between the columns has nothing left to divide. */
+        [data-wiz="2"] .col-set {
+            border-left: 0; padding-left: 0; margin-left: 0;
+            border-top: 1px solid var(--p-border-soft); padding-top: 14px;
+        }
+        .set-grid { grid-template-columns: 1fr; }
+        [data-wiz="2"] .col4 + .col4 > .sect:first-child {
+            border-top: 1px solid var(--p-border-soft); margin-top: 14px; padding-top: 14px;
+        }
+    }
+    .sect { flex: none; }
+    .sect .sec-l { margin-bottom: 7px; }
+    .sect + .sect,
+    [data-wiz="2"] .col4 + .col4 > .sect:first-child {
+        border-top: 1px solid var(--p-border-soft); margin-top: 14px; padding-top: 14px;
+    }
+
+    /* The content types. An icon tile carries the type, the border and a tick
+       carry the choice — a radio dot on top of both was one marker too many. */
+    /* Step 5 asks for one thing, so the step is one block: the state, what it
+       means, and the button. The manual route sits under it, demoted. */
+    /* The preview is dimmed while the embed is off: the lock is built, it is
+       just not reaching anyone yet. */
+    [data-wiz="3"] .stage { position: relative; }
+    [data-wiz="3"] .device { transition: filter .25s, opacity .25s; }
+    [data-wiz="3"] .device.off .sk,
+    [data-wiz="3"] .device.off .veil { filter: grayscale(.9); opacity: .45; }
+    .dev-badge {
+        position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 3;
+        padding: 5px 12px; border-radius: 999px; white-space: nowrap;
+        font-size: 11px; font-weight: 650;
+        background: var(--p-warning-bg); color: var(--p-warning-fg);
+        box-shadow: 0 4px 14px rgba(26, 26, 26, .16);
+    }
+
+    .embed-wrap { align-items: center; justify-content: center; text-align: center; }
+    .embed {
+        display: flex; flex-direction: column; align-items: center; flex: none;
+        width: 100%; max-width: 520px; padding: 26px; border-radius: 14px;
+        border: 1px solid var(--p-border); background: #fff;
+        box-shadow: 0 1px 2px rgba(26, 26, 26, .04), 0 12px 30px -22px rgba(26, 26, 26, .5);
+    }
+    /* The tile is where the state lives, so the card itself stays white. */
+    .embed-ic {
+        width: 48px; height: 48px; border-radius: 14px; flex: none; display: grid;
+        place-items: center; margin-bottom: 14px;
+        background: var(--p-warning-bg); color: var(--p-warning-fg);
+    }
+    .embed.on .embed-ic { background: var(--p-success-bg); color: var(--p-success-fg); }
+    .embed-ic svg { width: 25px; height: 25px; }
+    .embed-t { font-size: 17px; font-weight: 650; letter-spacing: -.015em; }
+    .embed-d { font-size: 12.5px; color: var(--p-text-sub); line-height: 1.45;
+               margin-top: 5px; max-width: 340px; }
+    .embed-act { margin-top: 18px; }
+    .embed-act .btn { padding: 8px 16px; }
+    .embed-note { font-size: 11.5px; color: var(--p-text-disabled); margin-top: 12px;
+                  max-width: 330px; line-height: 1.4; }
+
+    /* The fallback route, labelled on its own rule. */
+    .howto-l {
+        display: flex; align-items: center; gap: 12px; width: 100%; max-width: 680px;
+        margin-top: 28px; flex: none; color: var(--p-text-disabled);
+    }
+    .howto-l::before, .howto-l::after {
+        content: ''; flex: 1; height: 1px; background: var(--p-border);
+    }
+    .howto {
+        list-style: none; margin: 10px 0 0; padding: 0; flex: none; width: 100%;
+        max-width: 680px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px;
+    }
+    .howto li {
+        display: flex; flex-direction: column; align-items: center; gap: 7px;
+        font-size: 12px; line-height: 1.4; padding: 12px 11px; text-align: center;
+        border: 1px solid var(--p-border); border-radius: 10px; background: #fff;
+    }
+    .howto-n {
+        width: 21px; height: 21px; border-radius: 50%; flex: none; display: grid;
+        place-items: center; font-size: 11px; font-weight: 700;
+        background: var(--v-50); color: var(--accent-deep);
+    }
+
+    /* Step 6 runs its three jobs first, then shows the result. Each job has a
+       drawing that acts it out, swapped as the run moves on. */
+    .scenes {
+        position: relative; width: 132px; height: 132px; flex: none; margin-bottom: 10px;
+        color: var(--accent);
+    }
+    .scene {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        opacity: 0; transform: scale(.94); transition: opacity .3s, transform .3s;
+    }
+    .scene.on { opacity: 1; transform: none; }
+
+    /* 1 — the shackle swings down, the body draws, the bolt drops. */
+    .scene[data-s="1"].on .sc-shackle {
+        transform-origin: 60px 58px; animation: scShackle 1.5s ease-out infinite;
+    }
+    .scene[data-s="1"].on .sc-body {
+        stroke-dasharray: 190; animation: scDraw 1.5s ease-out infinite;
+    }
+    .scene[data-s="1"].on .sc-keyhole { animation: scBolt 1.5s ease-out infinite; }
+    .scene[data-s="1"].on .sc-ring { animation: scRing 1.5s ease-out infinite; }
+    @keyframes scShackle {
+        0%, 10% { transform: rotate(-42deg); opacity: 0; }
+        40%, 100% { transform: none; opacity: 1; }
+    }
+    @keyframes scDraw {
+        0% { stroke-dashoffset: 190; }
+        55%, 100% { stroke-dashoffset: 0; }
+    }
+    @keyframes scBolt {
+        0%, 55% { opacity: 0; transform: translateY(-5px); }
+        70%, 100% { opacity: 1; transform: none; }
+    }
+    @keyframes scRing {
+        0%, 60% { opacity: 0; transform: scale(.72); }
+        78% { opacity: .5; }
+        100% { opacity: 0; transform: scale(1.06); }
+    }
+
+    /* 2 — the lines fill in, the lock lands on the page. */
+    .scene[data-s="2"].on .sc-line {
+        stroke-dasharray: 40; animation: scLine 1.5s ease-out infinite;
+    }
+    .scene[data-s="2"].on .sc-line:nth-of-type(2) { animation-delay: .12s; }
+    .scene[data-s="2"].on .sc-line:nth-of-type(3) { animation-delay: .24s; }
+    .scene[data-s="2"].on .sc-badge { animation: scLand 1.5s cubic-bezier(.25,.9,.3,1.3) infinite; }
+    @keyframes scLine {
+        0%, 10% { stroke-dashoffset: 40; }
+        45%, 100% { stroke-dashoffset: 0; }
+    }
+    @keyframes scLand {
+        0%, 35% { opacity: 0; transform: translateY(16px) scale(.8); }
+        65% { opacity: 1; transform: translateY(-3px) scale(1.04); }
+        78%, 100% { opacity: 1; transform: none; }
+    }
+
+    /* 3 — the glass sweeps the panel, then the switch goes on. */
+    .scene[data-s="3"].on .sc-glass { animation: scSweep 1.8s ease-in-out infinite; }
+    .scene[data-s="3"].on .sc-knob { animation: scKnob 1.8s ease-out infinite; }
+    .scene[data-s="3"].on .sc-track { animation: scTrack 1.8s ease-out infinite; }
+    @keyframes scSweep {
+        0% { transform: translateX(-10px); opacity: 0; }
+        12% { opacity: 1; }
+        55% { transform: translateX(26px); opacity: 1; }
+        70%, 100% { transform: translateX(34px); opacity: 0; }
+    }
+    @keyframes scKnob {
+        0%, 62% { transform: none; }
+        80%, 100% { transform: translateX(12px); }
+    }
+    @keyframes scTrack {
+        0%, 62% { opacity: .45; }
+        80%, 100% { opacity: 1; }
+    }
+
+    .done-wrap.play .scenes { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .scene, .scene * { animation: none !important; transition: none !important; }
+    }
+
+    /* Step 6 runs its three jobs first, then shows the result. */
+    .prog { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 320px;
+            text-align: left; flex: none; }
+    .prog li {
+        display: flex; align-items: center; gap: 12px; padding: 10px 0; font-size: 13px;
+        color: var(--p-text-disabled); transition: color .25s;
+    }
+    .prog li.run, .prog li.ok, .prog li.warn { color: var(--p-text); }
+    .prog li.ok, .prog li.warn { font-weight: 550; }
+    .prog-m {
+        width: 20px; height: 20px; border-radius: 50%; flex: none; position: relative;
+        border: 2px solid var(--p-border); box-sizing: border-box;
+    }
+    .prog li.run .prog-m { border-top-color: var(--accent); animation: progSpin .7s linear infinite; }
+    .prog li.ok .prog-m { border-color: var(--p-success-fg); background: var(--p-success-fg); }
+    .prog li.ok .prog-m::after {
+        content: ''; position: absolute; left: 5px; top: 2px; width: 4px; height: 8px;
+        border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(42deg);
+    }
+    .prog li.warn .prog-m { border-color: var(--p-warning-fg); background: var(--p-warning-fg); }
+    .prog li.warn .prog-m::after {
+        content: '!'; position: absolute; inset: 0; display: grid; place-items: center;
+        color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
+    }
+    @keyframes progSpin { to { transform: rotate(360deg); } }
+
+    /* One of the two is on screen at a time. */
+    .done-res { display: none; flex-direction: column; align-items: center; width: 100%; }
+    .done-wrap.play .done-res { display: flex; }
+    .done-wrap.play .prog { display: none; }
+
+    /* Step 6: the lock, read back — with a burst, once, when it is live. */
+    .done-wrap { align-items: center; text-align: center; justify-content: center;
+                 position: relative; }
+    .confetti {
+        position: absolute; left: 0; right: 0; top: 0; height: 340px;
+        pointer-events: none; overflow: visible;
+    }
+    .confetti i {
+        position: absolute; left: 50%; top: 24px; width: 7px; height: 11px;
+        border-radius: 2px; opacity: 0; will-change: transform, opacity;
+    }
+    .done-wrap.play .confetti i { animation: burst 1.5s cubic-bezier(.15, .7, .3, 1) forwards; }
+    @keyframes burst {
+        0% { opacity: 0; transform: translate(-50%, 0) rotate(0deg) scale(.3); }
+        10% { opacity: 1; }
+        70% { opacity: 1; }
+        100% {
+            opacity: 0;
+            transform: translate(calc(-50% + var(--x)), var(--y)) rotate(var(--r)) scale(1);
+        }
+    }
+
+    .done-wrap.play .done-ic { animation: popperIn .7s cubic-bezier(.2, .8, .3, 1.2) both; }
+    @keyframes popperIn {
+        0% { opacity: 0; transform: rotate(-30deg) scale(.45); }
+        45% { opacity: 1; transform: rotate(9deg) scale(1.14); }
+        70% { transform: rotate(-5deg) scale(.97); }
+        100% { opacity: 1; transform: rotate(0) scale(1); }
+    }
+    .done-wrap.play .done-pill { animation: riseIn .5s ease-out .26s both; }
+    .done-wrap.play .done-h { animation: riseIn .5s ease-out .12s both; }
+    .done-wrap.play > p { animation: riseIn .5s ease-out .2s both; }
+    .done-wrap.play .done-sum { animation: riseIn .5s ease-out .36s both; }
+    .done-wrap.play .done-act { animation: riseIn .5s ease-out .44s both; }
+    .done-wrap.play .done-help { animation: riseIn .5s ease-out .52s both; }
+    @keyframes riseIn {
+        from { opacity: 0; transform: translateY(9px); }
+        to { opacity: 1; transform: none; }
+    }
+
+    /* Asked for less motion: everything is simply there. */
+    @media (prefers-reduced-motion: reduce) {
+        .done-wrap.play .confetti i,
+        .done-wrap.play .done-ic,
+        .done-wrap.play .done-h,
+        .done-wrap.play .done-pill,
+        .done-wrap.play > p,
+        .done-wrap.play .done-sum,
+        .done-wrap.play .done-act,
+        .done-wrap.play .done-help { animation: none; }
+        .confetti { display: none; }
+    }
+    /* A popper, not a tick: the lock exists either way, and the state it is in
+       is said by the pill under the heading. */
+    .done-ic {
+        width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center;
+        background: var(--accent-soft); color: var(--accent-strong); flex: none;
+    }
+    .done-ic svg { width: 31px; height: 31px; }
+    .done-pill {
+        display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; flex: none;
+        padding: 3px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 650;
+        background: var(--p-success-bg); color: var(--p-success-fg);
+    }
+    .done-pill::before {
+        content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+    }
+    .done-pill.wait { background: var(--p-warning-bg); color: var(--p-warning-fg); }
+    .done-h { font-size: 23px; font-weight: 650; letter-spacing: -.02em; margin-top: 14px; }
+    .done-wrap > p { margin-top: 6px; }
+    .done-sum {
+        margin-top: 20px; width: 100%; max-width: 440px; text-align: left; flex: none;
+        border: 1px solid var(--p-border); border-radius: 11px; overflow: hidden;
+    }
+    .done-row { display: flex; gap: 14px; padding: 9px 13px; font-size: 12.5px; }
+    .done-row + .done-row { border-top: 1px solid var(--p-border-soft); }
+    .done-act { display: flex; gap: 9px; margin-top: 22px; flex: none; }
+    .done-act .btn { padding: 8px 16px; }
+    .done-act .btn svg { width: 15px; height: 15px; }
+    .done-help { font-size: 12px; color: var(--p-text-sub); margin-top: 14px; flex: none; }
+    .done-help a { color: var(--link); font-weight: 550; }
+
+    /* A way out that is not one of the two choices. */
+    [data-wiz="6"] { position: relative; }
+    .done-x {
+        position: absolute; top: 14px; right: 16px; z-index: 2;
+        width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+        color: var(--p-text-sub); text-decoration: none; transition: background .12s, color .12s;
+    }
+    .done-x svg { width: 16px; height: 16px; }
+    .done-x:hover { background: #f1f1f1; color: var(--p-text); }
+    .done-k { width: 86px; flex: none; color: var(--p-text-sub); }
+    .done-v { font-weight: 550; min-width: 0; }
+
+    /* Two halves of one step: what the lock shows, and what makes it run.
+       Either can be absent, and then the other has the column to itself. */
+    [data-wiz="3"] .work-opts {
+        display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 26px;
+        align-content: start;
+    }
+    [data-wiz="3"] .half { display: flex; flex-direction: column; min-width: 0; }
+    [data-wiz="3"] .half .sec-l { margin-bottom: 8px; }
+    /* The design select sits alone in its row — the other kind is hidden
+       unless the lock needs both — so a two-column grid left it half width
+       and clipped “None (use default design)”. The pairs inside the widget
+       editor below still sit two across. */
+    [data-wiz="3"] #popupBlock > .fields2 { grid-template-columns: 1fr; gap: 12px; }
+    /* A plain button stretched across its field reads as a centred label;
+       it belongs under the start of the control it adds to. */
+    [data-wiz="3"] [data-new] { align-self: flex-start; }
+    /* The editor sits in a 736px column, so the palettes go three across and
+       the name is beside its swatches rather than above them. */
+    [data-wiz="3"] .palettes { grid-template-columns: repeat(3, 1fr); }
+    /* Narrower, the names stop fitting beside their swatches. */
+    @media (max-width: 1180px) { [data-wiz="3"] .palettes { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 900px) { [data-wiz="3"] .palettes { grid-template-columns: 1fr; } }
+
+    /* Step 1 has no preview beside it, so it uses the card itself: the lock's
+       own settings on the left, what it covers on the right. */
+    #scope { grid-template-columns: repeat(2, 1fr); }
+    [data-wiz="1"] #itemsRow, [data-wiz="1"] .field { max-width: 640px; }
+    /* In the sheet, not inline, so the short-window tiers below can trim it. */
+    [data-wiz="1"] #repromptWrap { margin-top: 18px; }
+
+    @media (min-width: 1100px) {
+        [data-wiz="1"] .work-opts {
+            display: grid; grid-template-columns: 340px minmax(0, 1fr);
+            column-gap: 36px; align-content: safe center;
+        }
+        [data-wiz="1"] .col-form, [data-wiz="1"] .col-scope {
+            display: flex; flex-direction: column; min-width: 0;
+        }
+        /* So the rules above can ask how wide this column actually is. */
+        [data-wiz="1"] .col-scope { container-type: inline-size; }
+        [data-wiz="1"] .col-form .field { max-width: none; }
+        [data-wiz="1"] .col-form .divider { display: none; }
+        [data-wiz="1"] #actionWrap { margin-top: 20px; }
+        [data-wiz="1"] #priceWrap { margin-top: 20px; max-width: none; }
+    }
+
+    /* Stacked, the wrappers get out of the way and the order is the one it has
+       to read in: name, then what to lock, then what locking does. */
+    @media (max-width: 1099px) {
+        [data-wiz="1"] .col-form, [data-wiz="1"] .col-scope { display: contents; }
+        [data-wiz="1"] .col-form > .field:first-child { order: 1; }
+        [data-wiz="1"] .col-scope > * { order: 2; }
+        [data-wiz="1"] .col-form > .divider,
+        [data-wiz="1"] #actionWrap,
+        [data-wiz="1"] #priceWrap { order: 3; }
+        [data-wiz="1"] #repromptWrap { order: 4; }
+    }
+
+    /* Step 2's panel is the tall thing on that step. Below this it gives up
+       spacing rather than content: the label box stops reserving a second
+       line, the divider closes up, and the cards sit tighter. */
+    @media (min-width: 1100px) and (max-height: 730px) {
+        [data-wiz="2"] .col-h { margin-bottom: 5px; min-height: 0; }
+        [data-wiz="2"] #variantWrap { padding-bottom: 6px; margin-bottom: 8px; }
+        /* Activate and Expire side by side, each with its time under its date.
+           The same four inputs in half the height. */
+        [data-wiz="2"] #scheduleWrap .fields2 { grid-template-columns: 1fr 1fr; gap: 0 12px; }
+        [data-wiz="2"] #scheduleWrap .row.g8 { flex-direction: column; align-items: stretch; gap: 6px; }
+        [data-wiz="2"] #scheduleWrap .row.g8 .input { width: 100% !important; }
+        [data-wiz="2"] #variantWrap > .sec-l { margin-bottom: 5px; }
+        /* One question above the other, each one's options side by side across
+           the full panel. Every option title then fits on one line, which two
+           questions abreast could not do at ~148px a card. */
+    }
+
+    /* Where the window is short, step 1 changes shape instead of tightening.
+       The eight types go four across — two rows instead of four — and keep
+       every pixel of their normal padding and gaps. They give up their
+       one-line descriptions, because 180px is not a column for a sentence,
+       and that is the only thing lost. */
+    @media (min-width: 1100px) and (max-height: 760px) {
+        [data-wiz="1"] .opt-d { display: none; }
+        [data-wiz="1"] #repromptWrap .act-d { display: none; }
+
+        /* The column answers this, not the window. Four across costs ~95px
+           where two across cost ~190, and the left column is the taller one
+           either way — so the space that buys goes straight back into
+           spacing rather than being banked. */
+        @container (min-width: 690px) {
+            [data-wiz="1"] #scope { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+            [data-wiz="1"] #scope .opt { padding: 9px 11px; }
+            [data-wiz="1"] .pickbar { padding: 11px; margin-top: 14px; }
+            [data-wiz="1"] #repromptWrap { margin-top: 18px; }
+        }
+        /* Too narrow for four, so the old trade applies: a little spacing. */
+        @container (max-width: 689px) {
+            [data-wiz="1"] #scope { gap: 5px; }
+            [data-wiz="1"] #scope .opt { padding: 5px 10px; }
+            [data-wiz="1"] #repromptWrap { margin-top: 12px; }
+        }
+    }
+
+    .stage.w { width: 296px; justify-content: center; }
+    .device { width: 214px; height: 322px; }
+
+    @media (max-width: 1180px) {
+        .page { height: auto; }
+        .opts2, .fields2, .cond-f { grid-template-columns: 1fr; }
+        .howto { grid-template-columns: 1fr; }
+        .howto li { flex-direction: row; text-align: left; gap: 10px; }
+        #scope { grid-template-columns: repeat(2, 1fr); }
+        .work-opts { overflow: visible; }
+        .stage.w { align-self: stretch; }
+    }
+
+    /* Short windows: the card trades spacing, then detail, so its contents
+       always fit rather than being clipped. Width-scoped so it never fights
+       the stacked narrow layout. */
+    @media (min-width: 901px) and (max-height: 940px) {
+        .stepper { padding-bottom: 10px; }
+        .st-n { width: 30px; height: 30px; font-size: 12px; }
+        .st:not(:last-child)::after { top: 15px; left: calc(50% + 22px); right: calc(-50% + 22px); }
+        .st-t { margin-top: 6px; }
+        .device { height: 286px; }
+        .work-head { padding-top: 14px; }
+        .work-body { padding-top: 10px; }
+        .work-foot { margin-top: 10px; }
+        .opts2 { gap: 5px; }
+        .opts2 .opt { padding: 6px 10px; }
+    }
+
+    @media (min-width: 901px) and (max-height: 820px) {
+        .stepper { padding-bottom: 8px; }
+        .st-n { width: 26px; height: 26px; font-size: 11.5px; }
+        .st:not(:last-child)::after { top: 13px; left: calc(50% + 20px); right: calc(-50% + 20px); }
+        .st-t { font-size: 12px; margin-top: 5px; }
+        .st-now { font-size: 10px; margin-top: 1px; }
+        [data-wiz="2"] .help { display: none; }
+        .device { height: 244px; }
+        .work-h { font-size: 19px; }
+        .work-head p, .helpnote-d { display: none; }
+        .work-body { gap: 18px; }
+    }
+
+    @media (min-width: 901px) and (min-height: 790px) {
+        [data-wiz="1"] .opts2 { gap: 9px; }
+        [data-wiz="1"] .pickbar { padding: 11px; margin-top: 14px; }
+        [data-wiz="1"] .divider { margin: 20px 0 !important; }
+    }
+
+    /* Step 2 asks the most, so it is the tallest step and trims first. The
+       operator line repeats the control above it and the count repeats the
+       list above it; the Settings hints are a sentence each under a field
+       whose label already says what it does. */
+    @media (min-width: 901px) and (max-height: 820px) {
+        [data-wiz="2"] #operatorHelp,
+        [data-wiz="2"] #condCount { display: none; }
+        /* The two cards give back their chrome the way everything else does. */
+        [data-wiz="2"] .col-h { margin-bottom: 4px; min-height: 0; }
+        [data-wiz="2"] .sect { margin-top: 10px; padding-top: 10px; }
+        [data-wiz="2"] .addtile { padding: 9px; }
+    }
+    /* Then the second half of the Schedule pair and the Status note: what the
+       fields are is on their labels. */
+    @media (min-width: 901px) and (max-height: 720px) {
+        [data-wiz="2"] .sect { margin-top: 10px; padding-top: 10px; }
+        [data-wiz="2"] .field + .field { margin-top: 2px; }
+    }
+
+    /* The switch is the taller half, so it trims first: the line repeating
+       the heading above it, the rule naming the three cards below it, and a
+       few pixels off the card itself. */
+    @media (min-width: 901px) and (max-height: 740px) {
+        [data-wiz="3"] .embed-d { display: none; }
+        [data-wiz="3"] .embed { padding: 15px 18px; }
+        [data-wiz="3"] .embed-ic { width: 34px; height: 34px; margin-bottom: 8px; }
+        [data-wiz="3"] .embed-act { margin-top: 11px; }
+        [data-wiz="3"] .howto-l { display: none; }
+        [data-wiz="3"] .howto { margin-top: 14px; }
+        [data-wiz="3"] .howto li { padding: 7px 9px; }
+    }
+
+    /* Below this the popup half outgrows the box, so the looks/says
+       explainer goes — the line under it reports the same state. */
+    @media (min-width: 901px) and (max-height: 715px) {
+        [data-wiz="3"] #saysBox { display: none; }
+    }
+
+    /* The wording fields live on the step rather than behind a button, so the
+       step gives up the two sentences around them before anything you type
+       in. The placeholders already show what a blank field falls back to. */
+    @media (min-width: 901px) and (max-height: 780px) {
+        [data-wiz="3"] .wfields { gap: 8px 14px; }
+        [data-wiz="3"] #popupBlock > .help { display: none; }
+    }
+
+    /* Step 3 keeps room to spare rather than fitting exactly. The badge in
+       the half’s heading already says Form or Text, so the sentence under the
+       select explaining which is the first thing it gives up. */
+    @media (min-width: 901px) and (max-height: 770px) {
+        [data-wiz="3"] #widgetKindWhy { display: none; }
+    }
+
+    /* Making a widget is taller than choosing one, so it trims on its own
+       ladder: first the note under it, then the refinements — padding, radius
+       and button text, which are adjustments to a design the palette has
+       already decided, and which the Widgets page also has. */
+    @media (min-width: 901px) and (max-height: 860px) {
+        [data-wiz="3"] #newNote { display: none; }
+        [data-wiz="3"] .pal { padding: 5px 9px; }
+        [data-wiz="3"] .palettes { gap: 5px; }
+    }
+    @media (min-width: 901px) and (max-height: 820px) {
+        [data-wiz="3"] #wStyle { display: none; }
+    }
+
+    /* Below this the editor has already given up the note and the style
+       numbers; what is left is the headings' own breathing room. */
+    @media (min-width: 901px) and (max-height: 760px) {
+        [data-wiz="3"] #newWidget .new-h { margin: 7px 0 4px; }
+    }
+
+    /* Step 5 trims early and keeps ~60px spare, rather than fitting exactly. */
+    @media (min-width: 901px) and (max-height: 830px) {
+        .embed { padding: 19px 22px; }
+        .embed-ic { width: 42px; height: 42px; margin-bottom: 11px; }
+        .embed-t { font-size: 16px; }
+        .embed-act { margin-top: 15px; }
+        .embed-note { display: none; }
+        .howto-l { margin-top: 20px; }
+        .howto li { padding: 10px 9px; }
+    }
+
+    @media (min-width: 901px) and (max-height: 694px) {
+        .act { padding: 7px 10px; }
+        .act-d { display: none; }
+        .seg-d { display: none; }
+        /* A couple of pixels a row is another condition on screen. */
+        .crow { padding: 6px 11px; margin-bottom: 5px; }
+        .addtile { padding: 9px; }
+    }
+
+    /* Below this, step 1 gives up its descriptions too. Steps 2 and 4 are
+       already trimmed well above here; step 1 had slack to spare. */
+    @media (min-width: 901px) and (max-width: 1099px) and (max-height: 759px),
+           (min-width: 1100px) and (max-height: 599px) {
+        .opts2 .opt { padding: 7px 9px; }
+        .opts2 .opt-d { display: none; }
+        .opt-ic { width: 24px; height: 24px; border-radius: 7px; }
+        .opt-ic svg { width: 14px; height: 14px; }
+        #itemsSub { display: none; }
+        .pickbar { padding: 7px 10px; }
+        #lockName + .help { display: none; }
+    }
+
+    /* Narrow: the circles and their labels shrink but all four stay in the
+       row, so the stepper still reads as one line of progress. */
+    @media (max-width: 900px) {
+        .page.full { padding: 12px 12px 28px; }
+        .stepper { padding-bottom: 10px; }
+        .st-n { width: 28px; height: 28px; font-size: 12px; }
+        .st:not(:last-child)::after { top: 14px; left: calc(50% + 20px); right: calc(-50% + 20px); }
+        .st-t { font-size: 11.5px; margin-top: 6px; padding: 0 2px; }
+        .st-now { display: none; }
+
+        .work-head { padding: 16px 16px 0; }
+        .work-body { padding: 12px 16px 0; gap: 16px; }
+        .work-foot { padding: 11px 16px; margin-top: 14px; }
+        .work-h { font-size: 19px; }
+
+        .device { height: 272px; }
+        .palettes { grid-template-columns: 1fr; }
+    }
+
+    /* The count and the operator stop sharing a row before the control has to
+       shrink. */
+    @media (max-width: 700px) {
+        [data-wiz="2"] .between { flex-wrap: wrap; row-gap: 9px; }
+        .seg { width: 100%; }
+        .seg-b { flex: 1; text-align: center; }
+    }
+
+    /* Phones. The footer keeps its actions on one line; everything else gives
+       up its side padding first. */
+    @media (max-width: 480px) {
+        .page.full { padding: 10px 8px 24px; }
+        .work-head, .work-body, .work-foot { padding-left: 13px; padding-right: 13px; }
+        .work-foot { flex-wrap: wrap; gap: 8px; }
+        .work-foot .row { gap: 10px; margin-left: auto; }
+        #scope { grid-template-columns: 1fr; }
+        .stage { padding: 14px 12px 12px; }
+        .swatch { font-size: 12px; }
+    }
+</style>
+
+<main class="page full">
+
+    <!-- The steps, above the card: circles joined by a rule, labels beneath. -->
+    <nav class="stepper" aria-label="Steps">
+        <ol id="steps">
+            <li class="st on" data-st="1">
+                <span class="st-n">1</span>
+                <span class="st-t">What to lock</span>
+                <span class="st-now">Current</span>
+            </li>
+            <li class="st" data-st="2">
+                <span class="st-n">2</span>
+                <span class="st-t">Who gets in</span>
+                <span class="st-now">Current</span>
+            </li>
+            <li class="st" data-st="3">
+                <span class="st-n">3</span>
+                <span class="st-t">What visitors see</span>
+                <span class="st-now">Current</span>
+            </li>
+            <li class="st" data-st="4">
+                <span class="st-n">4</span>
+                <span class="st-t">Turn it on</span>
+                <span class="st-now">Current</span>
+            </li>
+            <li class="st" data-st="6">
+                <span class="st-n">6</span>
+                <span class="st-t">Done</span>
+                <span class="st-now">Current</span>
+            </li>
+        </ol>
+    </nav>
+
+    <div class="split">
+
+        <!-- ============================================================= work -->
+        <section class="work">
+
+            <!-- ====================================== step 1: what to lock -->
+            <div class="wiz" data-wiz="1" style="display:flex;flex-direction:column;flex:1;min-height:0">
+                <div class="work-head">
+                    <div>
+                        <h2 class="work-h" id="wizH">What should this lock protect?</h2>
+                        <p class="sm sub mt4">Name it, choose the content, and decide what locking actually
+                            does to it.</p>
+                    </div>
+                    <a class="helpnote" href="#" aria-label="Chat with support">
+                        <span class="helpnote-ic" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 14a2 2 0 01-2 2H8l-4 4V6a2 2 0 012-2h12a2 2 0 012 2z"></path>
+                            </svg>
+                        </span>
+                        <span>
+                            <span class="helpnote-t">Stuck on any of this?</span>
+                            <span class="helpnote-d">Chat with us and we&rsquo;ll set it up with you.</span>
+                        </span>
+                    </a>
+                </div>
+
+                <div class="work-body">
+                    <div class="work-opts">
+
+                        <!-- The lock itself: what it is called and what locking does. -->
+                        <div class="col-form">
+                            <div class="field" style="flex:none;margin-bottom:12px;max-width:430px">
+                                <label class="label" for="lockName">Lock name <span class="req" aria-hidden="true">*</span></label>
+                                <input class="input" id="lockName" aria-required="true" placeholder="e.g. Wholesale catalogue">
+                                <span class="help">Only you see this. It appears in your locks list.</span>
+                            </div>
+                            <div class="divider" style="margin:12px 0;flex:none"></div>
+
+                            <div class="field" id="actionWrap" style="flex:none;max-width:430px">
+                                <span class="label">When locked, do this</span>
+                                <div class="acts tiles" id="action" role="radiogroup"
+                                     aria-label="When locked, do this"></div>
+                            </div>
+
+                            <!-- Hide Price Rule swaps the action for its own settings. -->
+                            <div id="priceWrap" class="hide" style="flex:none;max-width:480px">
+                                <span class="sec-l" style="margin-bottom:7px">Price visibility</span>
+                                <div class="field">
+                                    <label class="label" for="priceMsg">Price hidden message</label>
+                                    <input class="input" id="priceMsg" placeholder="Sign in to see price">
+                                    <span class="help">Message to display in place of the price.</span>
+                                </div>
+                                <span class="label mt12">Visibility options</span>
+                                <div class="acts">
+                                    <label class="act">
+                                        <input type="checkbox" checked>
+                                        <span class="act-box" aria-hidden="true"></span>
+                                        <span class="act-c">
+                                            <span class="act-t">Hide on all pages (Collections,
+                                                Search, etc.)</span>
+                                            <span class="act-d">Price is hidden wherever the product
+                                                appears.</span>
+                                        </span>
+                                    </label>
+                                    <label class="act">
+                                        <input type="checkbox" checked>
+                                        <span class="act-box" aria-hidden="true"></span>
+                                        <span class="act-c">
+                                            <span class="act-t">Disallow Add to Cart / Checkout</span>
+                                            <span class="act-d">Hides Add to Cart buttons and prevents
+                                                checkout.</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- What it covers. -->
+                        <div class="col-scope">
+                            <span class="sec-l" style="margin-bottom:7px">Content to lock <span class="req" aria-hidden="true">*</span></span>
+                            <div class="opts2" id="scope">
+                                <button class="opt" data-sum="Products">
+                                    <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.2l9-5 9 5v7.6l-9 5-9-5z"/><path d="M3 8.2l9 5 9-5M12 13.2v7.6"/></svg></span>
+                                    <span><span class="opt-t">Products</span>
+                                    <span class="opt-d">Individual products, by hand or by a rule.</span></span>
+                                    <span class="opt-tick"></span>
+                                </button>
+                                <button class="opt" data-sum="Collections">
+                                    <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span>
+                                    <span><span class="opt-t">Collections</span>
+                                    <span class="opt-d">Lock a trade catalogue, leave the rest open.</span></span>
+                                    <span class="opt-tick"></span>
+                                </button>
+                                <button class="opt" data-sum="Pages">
+                                    <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span>
+                                    <span><span class="opt-t">Pages</span>
+                                    <span class="opt-d">Course pages, downloads, price lists.</span></span>
+                                    <span class="opt-tick"></span>
+                                </button>
+                                <button class="opt" data-sum="Blogs">
+                                    <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg></span>
+                                    <span><span class="opt-t">Blogs</span>
+                                    <span class="opt-d">A whole blog, for members-only writing.</span></span>
+                                    <span class="opt-tick"></span>
+                                </button>
+                                <button class="opt" data-sum="Hide price rule">
+                                    <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.5l8-8H20v8.5l-8 8z"/><circle cx="15.8" cy="8.2" r="1.3"/><path d="M4 20l16-16"/></svg></span>
+                                    <span><span class="opt-t">Hide price rule</span>
+                                    <span class="opt-d">Products stay visible; price and cart hidden.</span></span>
+                                    <span class="opt-tick"></span>
+                                </button>
+                                <button class="opt" data-sum="Liquid theme">
+                                    <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s5.5 5.3 5.5 9a5.5 5.5 0 11-11 0C6.5 8.3 12 3 12 3z"/></svg></span>
+                                    <span><span class="opt-t">Liquid theme</span>
+                                    <span class="opt-d">Target a theme rather than its pages.</span></span>
+                                    <span class="opt-tick"></span>
+                                </button>
+                                <button class="opt" data-sum="Store">
+                                    <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5V20h16V9.5"/><path d="M3 9.5L4.8 4h14.4L21 9.5a3 3 0 01-6 0 3 3 0 01-6 0 3 3 0 01-6 0z"/><path d="M10 20v-5h4v5"/></svg></span>
+                                    <span><span class="opt-t">Store</span>
+                                    <span class="opt-d">Every page of the storefront asks for access.</span></span>
+                                    <span class="opt-tick"></span>
+                                </button>
+                                <button class="opt" data-sum="Checkout">
+                                    <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2.2l2.1 10.5a1.6 1.6 0 001.6 1.3h8.3a1.6 1.6 0 001.6-1.3L20.5 7H6"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg></span>
+                                    <span><span class="opt-t">Checkout (Plus)</span>
+                                    <span class="opt-d">Stop a locked item being bought via a cart link.</span></span>
+                                    <span class="opt-tick"></span>
+                                </button>
+                            </div>
+
+                            <div class="pickbar mt10" id="itemsRow">
+                                <span class="pickbar-ic">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M4 7h16M4 12h16M4 17h10"></path>
+                                    </svg>
+                                </span>
+                                <span class="grow">
+                                    <span class="sm strong" id="itemsText">Choose a type above first</span>
+                                    <span class="help" id="itemsSub">Pick the exact items this lock
+                                        covers.</span>
+                                </span>
+                                <button class="btn hide" id="clearItems">Clear all</button>
+                                <button class="btn" id="browse" disabled>Choose items</button>
+                            </div>
+
+                            <!-- How long an unlock survives. It is here rather than in step 2
+                                 because it is what the lock does, like the action beside it —
+                                 step 2 is who gets in. -->
+                            <div id="repromptWrap" class="fit-w">
+                                <span class="sec-l" style="margin-bottom:7px">How long access lasts</span>
+                                <div class="acts fit tiles" role="radiogroup" aria-label="How long access lasts">
+                                    <label class="act on">
+                                        <input type="radio" name="reprompt" value="device" checked>
+                                        <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="12.5" rx="2"/><path d="M8 20.5h8M12 16.5v4"/></svg></span>
+                                        <span class="act-c">
+                                            <span class="act-t">Stay unlocked on this device</span>
+                                            <span class="act-d">They unlock once and are not asked again
+                                                on that browser.</span>
+                                        </span>
+                                        <span class="act-tick" aria-hidden="true"></span>
+                                    </label>
+                                    <label class="act">
+                                        <input type="radio" name="reprompt" value="session">
+                                        <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M2.5 8.5h19M6 6.2h.01M8.6 6.2h.01"/></svg></span>
+                                        <span class="act-c">
+                                            <span class="act-t">Ask again next browsing session</span>
+                                            <span class="act-d">The unlock lasts until they close the
+                                                browser.</span>
+                                        </span>
+                                        <span class="act-tick" aria-hidden="true"></span>
+                                    </label>
+                                    <label class="act">
+                                        <input type="radio" name="reprompt" value="always">
+                                        <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14-4.5L4 9"/><path d="M4 13a8 8 0 0 0 14 4.5L20 15"/><path d="M4 5v4h4M20 19v-4h-4"/></svg></span>
+                                        <span class="act-c">
+                                            <span class="act-t">Ask on every page view</span>
+                                            <span class="act-d">Every locked page asks again, every
+                                                time.</span>
+                                        </span>
+                                        <span class="act-tick" aria-hidden="true"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ======================================= step 2: who gets in -->
+            <div class="wiz hide" data-wiz="2" style="flex-direction:column;flex:1;min-height:0">
+                <div class="work-head">
+                    <div>
+                        <h2 class="work-h">Who gets in, and on what terms</h2>
+                        <p class="sm sub mt4">The checks a visitor has to pass, and how the lock
+                            behaves once they do.</p>
+                    </div>
+                    <a class="helpnote" href="#" aria-label="Chat with support">
+                        <span class="helpnote-ic" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 14a2 2 0 01-2 2H8l-4 4V6a2 2 0 012-2h12a2 2 0 012 2z"></path>
+                            </svg>
+                        </span>
+                        <span>
+                            <span class="helpnote-t">Stuck on any of this?</span>
+                            <span class="helpnote-d">Chat with us and we&rsquo;ll set it up with you.</span>
+                        </span>
+                    </a>
+                </div>
+
+                <div class="work-body">
+                    <div class="work-opts">
+
+                        <!-- What has to be true, and what that does to a product page.
+                             Both are the lock's own rules, so they share a column. -->
+                        <div class="col-conds">
+                        <div class="col-h">
+                            <span class="sec-l">Conditions</span>
+                            <div class="seg" id="operator" role="radiogroup"
+                                 aria-label="How the conditions combine">
+                                <label class="seg-b on">
+                                    <input type="radio" name="op" value="AND" checked>
+                                    <span class="seg-t">AND</span>
+                                    <span class="seg-d">all must match</span>
+                                </label>
+                                <label class="seg-b">
+                                    <input type="radio" name="op" value="OR">
+                                    <span class="seg-t">OR</span>
+                                    <span class="seg-d">any can match</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="help" style="flex:none;margin-bottom:11px" id="operatorHelp">
+                            Customer must meet all of the conditions below to unlock access.</p>
+
+                        <div id="conds"></div>
+
+                        <button class="addtile" id="addCond">
+                            <span class="addtile-p" aria-hidden="true">&#43;</span> Add condition</button>
+                        <p class="help" style="flex:none;margin-top:8px" id="condCount">1 condition</p>
+                        </div>
+
+                        <div class="col-set">
+                        <div class="col-h">
+                            <!-- The qualifier belongs to the heading, not to the far end of
+                                 the column: a sec-l with a tag beside it is how the widget
+                                 editor already marks a section. -->
+                            <span><span class="sec-l">Settings</span><span class="tag">All optional</span></span>
+                        </div>
+                        <div class="set-grid">
+                        <div class="sect" id="variantWrap">
+                            <span class="sec-l">Variant behaviour (product locks only)</span>
+                        <div class="v-two">
+                        <div class="field">
+                            <span class="label">When a variant is locked</span>
+                            <div class="seg wide" role="radiogroup" aria-label="When a variant is locked">
+                                <label class="seg-b on">
+                                    <input type="radio" name="vLocked" value="hide" checked>
+                                    <span class="seg-t">Hide it entirely</span>
+                                </label>
+                                <label class="seg-b">
+                                    <input type="radio" name="vLocked" value="disable">
+                                    <span class="seg-t">Show it, but disabled</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <span class="label">When all variants are locked</span>
+                            <div class="chips" role="radiogroup" aria-label="When all variants of a product are locked">
+                                <label class="chip on">
+                                    <input type="radio" name="vAll" value="hide" checked>
+                                    <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5c2 0 3.7.6 5.1 1.5M22 12s-3.6 6.5-10 6.5c-2.2 0-4-.7-5.4-1.7"/><path d="M3 3l18 18"/></svg></span>
+                                    <span class="chip-t">Hide the product entirely</span>
+                                    <span class="act-tick" aria-hidden="true"></span>
+                                </label>
+                                <label class="chip">
+                                    <input type="radio" name="vAll" value="show">
+                                    <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5 10 6.5 10 6.5-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg></span>
+                                    <span class="chip-t">Leave the product visible</span>
+                                    <span class="act-tick" aria-hidden="true"></span>
+                                </label>
+                            </div>
+                        </div>
+                        </div>
+                        </div>
+                        <div class="col4">
+                            <div class="sect">
+                                <span class="sec-l">Redirect and search engines</span>
+                                <div class="fields2">
+                                    <div class="field">
+                                        <label class="label" for="redirect">Redirect URL (optional)</label>
+                                        <input class="input" id="redirect" placeholder="https://">
+                                        <span class="help">Send blocked visitors here instead of showing
+                                            the popup.</span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="label">Search engines</label>
+                                        <label class="chk" style="margin-top:5px"><input type="checkbox">
+                                            <span>Hide from search engines</span></label>
+                                        <span class="help">Adds a noindex meta tag so Googlebot won&rsquo;t
+                                            index the locked page.</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="col4">
+                            <div class="sect" id="scheduleWrap">
+                                <span class="sec-l">Schedule (optional)</span>
+                                <div class="fields2">
+                                    <div class="field">
+                                        <label class="label">Activate on</label>
+                                        <div class="row g8">
+                                            <input class="input" placeholder="mm/dd/yyyy">
+                                            <input class="input" style="width:110px" placeholder="--:--">
+                                        </div>
+                                        <span class="help">Leave blank to activate immediately.</span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="label">Expire on</label>
+                                        <div class="row g8">
+                                            <input class="input" placeholder="mm/dd/yyyy">
+                                            <input class="input" style="width:110px" placeholder="--:--">
+                                        </div>
+                                        <span class="help">Leave blank for no expiration.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================================= step 3: what visitors see -->
+            <div class="wiz hide" data-wiz="3" style="flex-direction:column;flex:1;min-height:0">
+                <div class="work-head">
+                    <div>
+                        <h2 class="work-h" id="step3H">What should visitors see?</h2>
+                        <p class="sm sub mt4" id="step3Sub">Choose how the popup looks, and
+                            switch the app on so it runs.</p>
+                    </div>
+                    <a class="helpnote" href="#" aria-label="Chat with support">
+                        <span class="helpnote-ic" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 14a2 2 0 01-2 2H8l-4 4V6a2 2 0 012-2h12a2 2 0 012 2z"></path>
+                            </svg>
+                        </span>
+                        <span>
+                            <span class="helpnote-t">Stuck on any of this?</span>
+                            <span class="helpnote-d">Chat with us and we&rsquo;ll set it up with you.</span>
+                        </span>
+                    </a>
+                </div>
+
+                <div class="work-body">
+                    <div class="work-opts">
+
+                        <!-- What the lock shows. -->
+                        <div class="half" id="popupHalf">
+                        <div class="between" id="kindBox" style="flex:none;margin-bottom:9px">
+                            <span class="sec-l" style="margin:0">What visitors see</span>
+                            <span class="tag form" id="needTag">Form</span>
+                        </div>
+                        <div class="notice hide" id="noPopup" style="flex:none">
+                            <span aria-hidden="true">&#9432;</span>
+                            <span><b>No popup is shown for this action.</b>
+                                <span id="noPopupWhy"></span> There is no widget or wording to set.</span>
+                        </div>
+
+                        <div id="popupBlock">
+                            <div class="fields2" style="flex:none">
+                                <div class="field" id="formWrap">
+                                    <span class="label">Form widget design</span>
+                                    <div class="picks-row">
+                                    <div class="picks" id="formDesign" role="radiogroup" aria-label="Form widget design">
+                                        <label class="pick on" data-bg="#ffffff" data-fg="#1a1a1a"
+                                               data-btn="#1a1a1a" data-btnfg="#ffffff">
+                                            <input type="radio" name="formDesign" value="" checked>
+                                            <span class="pick-sw" aria-hidden="true"
+                                                  style="background:#ffffff;color:#1a1a1a"><i style="background:#1a1a1a"></i></span>
+                                            <span class="pick-n">Default design</span>
+                                        </label>
+                                        <label class="pick" data-bg="#111a33" data-fg="#dfe5f5"
+                                               data-btn="#ffffff" data-btnfg="#111a33">
+                                            <input type="radio" name="formDesign" value="Trade gate">
+                                            <span class="pick-sw" aria-hidden="true"
+                                                  style="background:#111a33;color:#dfe5f5"><i style="background:#ffffff"></i></span>
+                                            <span class="pick-n">Trade gate</span>
+                                        </label>
+                                        <label class="pick" data-bg="#f5efe4" data-fg="#4a3a1e"
+                                               data-btn="#8a6a30" data-btnfg="#ffffff">
+                                            <input type="radio" name="formDesign" value="Members notice">
+                                            <span class="pick-sw" aria-hidden="true"
+                                                  style="background:#f5efe4;color:#4a3a1e"><i style="background:#8a6a30"></i></span>
+                                            <span class="pick-n">Members notice</span>
+                                        </label>
+                                    </div>
+                                    <button type="button" class="pick-add" data-new="form">
+                                        <span class="pick-plus" aria-hidden="true">+</span>
+                                        <span class="pick-n">Create widget</span>
+                                    </button>
+                                    </div>
+                                    <span class="help" id="widgetKindWhy">Used for conditions that
+                                        need user input (passcode, age verification).</span>
+                                </div>
+
+                                <div class="field hide" id="textWrap">
+                                    <span class="label">Text widget design</span>
+                                    <div class="picks-row">
+                                    <div class="picks" id="textDesign" role="radiogroup" aria-label="Text widget design">
+                                        <label class="pick on" data-bg="#ffffff" data-fg="#1a1a1a"
+                                               data-btn="#1a1a1a" data-btnfg="#ffffff">
+                                            <input type="radio" name="textDesign" value="" checked>
+                                            <span class="pick-sw" aria-hidden="true"
+                                                  style="background:#ffffff;color:#1a1a1a"><i style="background:#1a1a1a"></i></span>
+                                            <span class="pick-n">Default design</span>
+                                        </label>
+                                        <label class="pick" data-bg="#f5efe4" data-fg="#4a3a1e"
+                                               data-btn="#8a6a30" data-btnfg="#ffffff">
+                                            <input type="radio" name="textDesign" value="Members notice">
+                                            <span class="pick-sw" aria-hidden="true"
+                                                  style="background:#f5efe4;color:#4a3a1e"><i style="background:#8a6a30"></i></span>
+                                            <span class="pick-n">Members notice</span>
+                                        </label>
+                                    </div>
+                                    <button type="button" class="pick-add" data-new="text">
+                                        <span class="pick-plus" aria-hidden="true">+</span>
+                                        <span class="pick-n">Create widget</span>
+                                    </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Making a widget, in place. The device on the right is its
+                                 preview — it repaints as the palette is picked. -->
+                            <div class="hide" id="newWidget">
+                                <div class="between" style="flex:none;margin-bottom:9px">
+                                    <span class="sec-l" style="margin:0">New widget</span>
+                                    <span class="row g4">
+                                        <button class="btn plain xs" id="wLangSync">
+                                            <span class="pick-sync">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M20 11a8 8 0 0 0-14-4.5L4 9"></path>
+                                                    <path d="M4 13a8 8 0 0 0 14 4.5L20 15"></path>
+                                                    <path d="M4 5v4h4M20 19v-4h-4"></path></svg>
+                                                Sync languages
+                                            </span>
+                                        </button>
+                                    </span>
+                                </div>
+
+                                <div class="fields2" style="flex:none">
+                                    <div class="field">
+                                        <label class="label" for="wNameIn">Widget name</label>
+                                        <input class="input" id="wNameIn" placeholder="e.g. Trade gate">
+                                    </div>
+                                    <div class="field">
+                                        <label class="label" for="wLang">Popup language</label>
+                                        <select class="select" id="wLang">
+                                            <option>Follow the storefront language (recommended)</option>
+                                            <option>English</option><option>Deutsch</option>
+                                            <option>Fran&ccedil;ais</option>
+                                        </select>
+                                        <span class="help" id="wLangNote">Shopify decides which
+                                            languages your store publishes.</span>
+                                    </div>
+                                </div>
+
+                                <div class="row g8 new-h" style="flex:none">
+                                    <span class="sec-l">Colour palettes</span><span class="tag">Basic</span>
+                                </div>
+                                <div class="palettes" id="palettes"></div>
+
+                                <div class="row g8 new-h" style="flex:none">
+                                    <span class="sec-l">Colours</span><span class="tag">Basic</span>
+                                </div>
+                                <div class="row g8 wrap" style="flex:none" id="colours">
+                                    <label class="swatch"><input type="color" data-k="text" value="#FFFFFF">
+                                        <span>Text</span></label>
+                                    <label class="swatch"><input type="color" data-k="card" value="#6B7280">
+                                        <span>Card</span></label>
+                                    <label class="swatch"><input type="color" data-k="buttonBg" value="#000000">
+                                        <span>Button BG</span></label>
+                                    <label class="swatch"><input type="color" data-k="buttonText" value="#FFFFFF">
+                                        <span>Button text</span></label>
+                                </div>
+
+                                <div id="wStyle" style="flex:none">
+                                    <span class="sec-l new-h" style="display:block">Style</span>
+                                    <div class="wstyle">
+                                        <div class="field"><label class="label" for="wPad">Card pad</label>
+                                            <div class="row g8"><input class="input" id="wPad" value="10">
+                                            <span class="sm sub">px</span></div></div>
+                                        <div class="field"><label class="label" for="wRad">Card rad</label>
+                                            <div class="row g8"><input class="input" id="wRad" value="12">
+                                            <span class="sm sub">px</span></div></div>
+                                        <div class="field">
+                                            <label class="label" for="wBtnText">Button text</label>
+                                            <input class="input" id="wBtnText" placeholder="Submit">
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="help" id="newNote" style="display:block;flex:none;margin-top:10px">
+                                    Saved to your widget library and reusable by any lock.</span>
+
+                                <div class="row g8 new-foot" style="flex:none">
+                                    <button class="btn" id="newCancel">Cancel</button>
+                                    <button class="btn primary" id="newSave">Create widget</button>
+                                </div>
+                            </div>
+
+                            <div class="divider" id="saysRule" style="margin:14px 0;flex:none"></div>
+
+                            <div id="saysBox" style="flex:none">
+                                <span class="sec-l" style="display:block;margin-bottom:5px">What the
+                                    popup says</span>
+                                <p class="help" id="saysCopy">No design is selected, so it uses the
+                                    default look. Below is what it <em>says</em>, for this lock
+                                    only.</p>
+                                <p class="help hide" id="saysOther"></p>
+                            </div>
+
+                            <div id="wordBlock">
+                            <div class="between" style="flex:none;margin-top:4px">
+                                <span class="sec-l" style="margin:0">Wording for this lock</span>
+                                <select class="select" id="wordLang" style="width:auto;padding:4px 9px;font-size:12px">
+                                    <option>English (primary)</option><option>Deutsch</option>
+                                    <option>Fran&ccedil;ais</option>
+                                </select>
+                            </div>
+
+                            <div class="wfields mt10" style="flex:none">
+                                <div class="field"><label class="label" for="wTitle">Title</label>
+                                    <input class="input" id="wTitle" placeholder="Members only"></div>
+                                <div class="field"><label class="label" for="wMsg">Message</label>
+                                    <input class="input" id="wMsg" placeholder="Access restricted."></div>
+                                <div class="field" data-forfield="Passcode">
+                                    <label class="label" for="wPL">Passcode box &mdash; label</label>
+                                    <input class="input" id="wPL" placeholder="Passcode"></div>
+                                <div class="field" data-forfield="Passcode">
+                                    <label class="label" for="wPH">Passcode box &mdash; hint inside</label>
+                                    <input class="input" id="wPH" placeholder="Enter code"></div>
+                                <div class="field hide" data-forfield="Email address">
+                                    <label class="label" for="wEL">Email box &mdash; label</label>
+                                    <input class="input" id="wEL" placeholder="Email address"></div>
+                                <div class="field hide" data-forfield="Email address">
+                                    <label class="label" for="wEH">Email box &mdash; hint inside</label>
+                                    <input class="input" id="wEH" placeholder="you@example.com"></div>
+                                <div class="field" data-forbutton><label class="label" for="wBtn">Button</label>
+                                    <input class="input" id="wBtn" placeholder="Unlock"></div>
+                            </div>
+                            </div>
+
+                        </div>
+                        </div>
+
+                        <!-- What makes it run. -->
+                        <div class="half embed-wrap" id="embedHalf">
+                        <span class="sec-l" style="flex:none;margin-bottom:9px">Turn it on</span>
+                        <div class="embed" id="embedCard">
+                            <span class="embed-ic" id="embedIc" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 9v4M12 17h.01"></path>
+                                    <path d="M10.3 3.9L2.4 17.2A2 2 0 004.1 20.2h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"></path>
+                                </svg>
+                            </span>
+                            <span class="embed-t" id="embedT">App embed is off</span>
+                            <span class="embed-d" id="embedD">Your locks will not run on the
+                                storefront until you turn it on.</span>
+                            <div class="row g8 embed-act">
+                                <a class="btn primary" id="embedGo" href="#" target="_blank"
+                                   rel="noopener noreferrer">Enable in theme editor</a>
+                                <button class="btn" id="embedCheck">Check again</button>
+                            </div>
+                            <span class="embed-note" id="embedNote">Opens the editor with the embed already switched
+                                on &mdash; you only have to press Save.</span>
+                        </div>
+
+                        <span class="xs sub howto-l">Or switch it on yourself</span>
+                        <ol class="howto">
+                            <li><span class="howto-n">1</span><span><strong>Online Store &rsaquo;
+                                Themes</strong>, then <strong>Customize</strong> your live
+                                theme.</span></li>
+                            <li><span class="howto-n">2</span><span>Open <strong>App embeds</strong> in
+                                the left panel.</span></li>
+                            <li><span class="howto-n">3</span><span>Switch on <strong>Airo Access
+                                Lock</strong> and press <strong>Save</strong>.</span></li>
+                            <li><span class="howto-n">4</span><span>Come back here and press
+                                <strong>Check again</strong>.</span></li>
+                        </ol>
+                        </div>
+                    </div>
+
+                    <div class="stage w">
+                        <div class="device" data-preview-device>
+                            <div class="sk" id="sk3">
+                                <i style="width:46%;height:12px"></i><i class="gap"></i>
+                                <i></i><i style="width:88%"></i><i style="width:70%"></i><i class="gap"></i>
+                                <i style="width:40%;height:11px"></i><i></i><i style="width:80%"></i>
+                            </div>
+                            <div class="veil" id="veil3">
+                                <div class="hide" id="note3"
+                                     style="border:1px dashed #6e6e6e;border-radius:10px;padding:14px;
+                                            text-align:center;color:#8a8a8a;font-size:10.5px;line-height:1.4">
+                                    <span id="note3Text"></span>
+                                </div>
+                                <div class="lk" id="card3" style="background:#fff;color:#1a1a1a">
+                                    <div class="lk-ico">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                             stroke-width="1.8" stroke-linecap="round"><rect x="4" y="10.5" width="16" height="10" rx="2.5"></rect>
+                                        <path d="M8 10.5V7.5a4 4 0 018 0v3"></path></svg>
+                                    </div>
+                                    <div class="lk-t" id="t3">Members only</div>
+                                    <div class="lk-m" id="m3">Access restricted.</div>
+                                    <div id="f3"></div>
+                                    <div class="lk-b" id="b3" style="background:#1a1a1a;color:#fff">Unlock</div>
+                                </div>
+                            </div>
+                            <span class="dev-badge hide" id="devBadge">Not running yet</span>
+                        </div>
+                        <span class="stage-cap" id="cap3">What shoppers see</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================= step 6: done -->
+            <div class="wiz hide" data-wiz="6" style="flex-direction:column;flex:1;min-height:0">
+                <a class="done-x" id="doneX" href="locks.html" aria-label="Close setup">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                         stroke-linecap="round" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18"></path>
+                    </svg>
+                </a>
+                <div class="work-body" style="padding-top:0">
+                    <div class="work-opts done-wrap" id="doneWrap">
+                        <span class="confetti" id="confetti" aria-hidden="true"></span>
+
+                        <!-- What the step claims to be doing, done in front of you. -->
+                        <div class="scenes" id="scenes" aria-hidden="true">
+                            <!-- 1. the lock assembles: shackle swings down, body draws, it clicks -->
+                            <svg class="scene" data-s="1" viewBox="0 0 120 120" fill="none"
+                                 stroke="currentColor" stroke-width="3.4" stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <circle class="sc-ring" cx="60" cy="70" r="33" stroke-width="2"></circle>
+                                <path class="sc-shackle" d="M46 58V45a14 14 0 0 1 28 0v13"></path>
+                                <rect class="sc-body" x="33" y="58" width="54" height="38" rx="9"></rect>
+                                <path class="sc-keyhole" d="M60 72v9"></path>
+                            </svg>
+
+                            <!-- 2. the lock lands on the page it is protecting -->
+                            <svg class="scene" data-s="2" viewBox="0 0 120 120" fill="none"
+                                 stroke="currentColor" stroke-width="3.4" stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <rect class="sc-page" x="28" y="20" width="64" height="76" rx="9"></rect>
+                                <path class="sc-line" d="M41 40h26"></path>
+                                <path class="sc-line" d="M41 53h38"></path>
+                                <path class="sc-line" d="M41 66h20"></path>
+                                <g class="sc-badge">
+                                    <circle cx="60" cy="86" r="15" fill="var(--p-surface)"></circle>
+                                    <rect x="53" y="84" width="14" height="10" rx="2.6"
+                                          stroke-width="3"></rect>
+                                    <path d="M56 84v-3a4 4 0 0 1 8 0v3" stroke-width="3"></path>
+                                </g>
+                            </svg>
+
+                            <!-- 3. the glass sweeps the theme panel, the embed switches on -->
+                            <svg class="scene" data-s="3" viewBox="0 0 120 120" fill="none"
+                                 stroke="currentColor" stroke-width="3.4" stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <rect class="sc-panel" x="20" y="38" width="80" height="46" rx="11"></rect>
+                                <path d="M32 53h22M32 66h14" stroke-width="3" opacity=".45"></path>
+                                <rect class="sc-track" x="66" y="52" width="26" height="16" rx="8"
+                                      stroke-width="3"></rect>
+                                <circle class="sc-knob" cx="74" cy="60" r="4.4" fill="currentColor"
+                                        stroke="none"></circle>
+                                <g class="sc-glass">
+                                    <circle cx="46" cy="60" r="12" fill="var(--p-surface)"></circle>
+                                    <path d="M55 69l9 9"></path>
+                                </g>
+                            </svg>
+                        </div>
+
+                        <ol class="prog" id="prog" aria-live="polite">
+                            <li><span class="prog-m" aria-hidden="true"></span>
+                                <span class="prog-t">Creating your lock</span></li>
+                            <li><span class="prog-m" aria-hidden="true"></span>
+                                <span class="prog-t">Publishing it to your storefront</span></li>
+                            <li><span class="prog-m" aria-hidden="true"></span>
+                                <span class="prog-t" id="prog3">Checking the theme app embed</span></li>
+                        </ol>
+
+                        <div class="done-res" id="doneRes">
+                        <span class="done-ic" id="doneIc" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 21l4.6-11.4L18 20z"></path>
+                                <path d="M7.6 9.6L18 20"></path>
+                                <path d="M13.2 3.1v2.2M17.9 4.9l-1.6 1.6M20.6 9.4h-2.2M19.4 14.1l-1.9-1"></path>
+                                <circle cx="11.6" cy="7.6" r=".9"></circle>
+                            </svg>
+                        </span>
+                        <h2 class="done-h" id="doneH">Your first lock is live</h2>
+                        <span class="done-pill" id="donePill">Running on your storefront</span>
+                        <p class="sm sub" id="doneP" style="max-width:420px">
+                            Shoppers who do not pass your conditions will see your popup from now on.</p>
+
+                        <div class="done-sum">
+                            <div class="done-row"><span class="done-k">Name</span>
+                                <span class="done-v" id="doneName">&mdash;</span></div>
+                            <div class="done-row"><span class="done-k">Protects</span>
+                                <span class="done-v" id="doneProtects">&mdash;</span></div>
+                            <div class="done-row"><span class="done-k">Opens for</span>
+                                <span class="done-v" id="doneOpens">&mdash;</span></div>
+                            <div class="done-row"><span class="done-k">Shows</span>
+                                <span class="done-v" id="doneShows">&mdash;</span></div>
+                        </div>
+
+                        <div class="done-act">
+                            <a class="btn primary" href="lock-preview.html">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                                     aria-hidden="true">
+                                    <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"></path>
+                                    <circle cx="12" cy="12" r="2.6"></circle>
+                                </svg>
+                                Quick view
+                            </a>
+                            <a class="btn" href="locks.html">Close</a>
+                        </div>
+                        <span class="done-help">Not quite what you wanted?
+                            <a href="#">Chat with us</a> and we&rsquo;ll sort it.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="work-foot">
+                <button class="btn" id="back">Back</button>
+                <div class="row g8">
+                    <button class="btn primary" id="next">Continue</button>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+
+<!-- ===================================================== resource picker === -->
+<div class="modal-bg hide" id="pickModal">
+    <div class="modal" style="max-width:640px">
+        <div class="modal-head">
+            <h2 class="h-md" id="pickTitle">Select products</h2>
+            <button class="btn plain" data-close="pickModal" aria-label="Close">&#10005;</button>
+        </div>
+
+        <div style="padding:13px 16px;background:#fafafa;border-bottom:1px solid var(--p-border-soft)">
+            <div class="row g8 wrap">
+                <div class="searchbar grow" style="background:#fff">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+                    <span id="pickSearch">Search products&hellip;</span>
+                </div>
+                <select class="select" style="width:auto"><option>Title</option>
+                    <option>Vendor</option><option>ID</option></select>
+                <button class="btn">Add filter</button>
+            </div>
+        </div>
+
+        <div class="pick-bar" id="pickBar">
+            <span class="pick-n none" id="pickShowing">6 products</span>
+            <span class="grow"></span>
+            <button class="btn" id="pickSync">
+                <span class="pick-sync">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 11a8 8 0 0 0-14-4.5L4 9"></path>
+                        <path d="M4 13a8 8 0 0 0 14 4.5L20 15"></path>
+                        <path d="M4 5v4h4M20 19v-4h-4"></path></svg>
+                    Refresh from Shopify
+                </span>
+            </button>
+            <button class="btn" id="pickAll">Select all</button>
+        </div>
+
+        <div class="pick-list" id="pickList" style="border-top:1px solid var(--p-border-soft)"></div>
+
+        <div class="modal-foot between">
+            <span class="xs sub" id="pickCount">Nothing selected yet</span>
+            <div class="row g8">
+                <button class="btn" data-close="pickModal">Cancel</button>
+                <button class="btn primary" id="pickAdd" disabled>Add selected</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================== bulk entry === -->
+<!-- The builder's "Add in bulk": paste a list, or upload a CSV. -->
+<div class="modal-bg hide" id="condModal">
+    <div class="modal" style="max-width:520px">
+        <div class="modal-head">
+            <h2 class="h-md" id="condTitle">Add a condition</h2>
+            <button class="btn plain" data-close="condModal" aria-label="Close">&#10005;</button>
+        </div>
+        <div style="padding:16px">
+            <div class="row g8" style="margin-bottom:12px">
+                <span class="tag">Permit if</span>
+                <span class="tag form" id="condKind">Form</span>
+            </div>
+            <div class="cond-f">
+                <div class="field">
+                    <label class="label" for="condType">Condition type</label>
+                    <select class="select" id="condType"></select>
+                </div>
+                <div class="field" id="condField"></div>
+            </div>
+        </div>
+        <div class="modal-foot between">
+            <span class="xs sub" id="condNote">Every condition is checked when a shopper arrives.</span>
+            <div class="row g8">
+                <button class="btn" data-close="condModal">Cancel</button>
+                <button class="btn primary" id="condSave">Add condition</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-bg hide" id="bulkModal">
+    <div class="modal" style="max-width:560px">
+        <div class="modal-head">
+            <h2 class="h-md" id="bulkTitle">Add in bulk</h2>
+            <button class="btn plain" data-close="bulkModal" aria-label="Close">&#10005;</button>
+        </div>
+        <div style="padding:16px">
+            <p class="sm sub" id="bulkHelp">One per line. Commas, tabs and semicolons all work, and a
+                header row is ignored.</p>
+            <textarea class="textarea mono" id="bulkText" style="min-height:150px;margin-top:10px;font-size:12px"
+                      placeholder="hana@mori.jp,TRADE-8841"></textarea>
+            <div class="row g8 mt12 wrap">
+                <span class="tag live" id="bulkValid">0 valid</span>
+                <span class="tag" id="bulkDupes">0 duplicates merged</span>
+                <span class="grow"></span>
+                <button class="btn plain xs">&#8679; Upload CSV</button>
+                <button class="btn plain xs">&#8681; Download template</button>
+            </div>
+        </div>
+        <div class="modal-foot between">
+            <span class="xs sub">Limit 1,000 per condition</span>
+            <div class="row g8">
+                <button class="btn" data-close="bulkModal">Cancel</button>
+                <button class="btn primary" id="bulkAdd">Replace list</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====================================================== popup wording === -->
+
+<script src="assets/app.js"></script>
+<script src="assets/lock-form.js"></script>
+<script src="assets/lock-controls.js"></script>
+<script src="assets/setup.js"></script>
+</html>

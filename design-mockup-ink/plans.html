@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subscriptions &mdash; Airo Access Lock</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+    /* This page drops Polaris almost entirely and is laid out with inline
+       styles: a centred header, a usage strip, a pill billing toggle and three
+       hand-built plan cards. */
+    .usage {
+        display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+        padding: 13px 18px; margin: 0 auto 16px; max-width: 920px;
+        border: 1px solid var(--p-border); border-radius: 14px; background: #fff;
+        box-shadow: var(--p-card-shadow);
+    }
+    .usage-badge {
+        font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+        padding: 4px 10px; border-radius: 7px; background: var(--accent); color: #fff; flex: none;
+    }
+    .usage-name { display: block; font-size: 13px; font-weight: 650; }
+    .usage-sub { display: block; font-size: 12px; color: var(--p-text-sub); margin-top: 1px; }
+    .usage-meter { flex: 1; min-width: 220px; }
+    .usage-bar { height: 6px; border-radius: 20px; background: #e3e3e3; overflow: hidden; }
+    .usage-bar > i { display: block; height: 100%; border-radius: 20px; background: var(--accent); }
+
+    /* The three line up along the bottom as well as the top: a row of cards
+       of three different heights reads as three unrelated things. */
+    .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+        max-width: 920px; margin: 0 auto; align-items: stretch; }
+    .plan {
+        position: relative; background: #fff; border-radius: 16px;
+        border: 1px solid var(--p-border-soft); box-shadow: 0 1px 2px rgba(26, 26, 26, .05);
+        padding: 22px 20px 20px; display: flex; flex-direction: column;
+    }
+    .plan .feat { line-height: 1.5; }
+    /* Emphasis marks what you might buy. The plan you are already on is a
+       state, so it is said with a ring and a badge, not by inverting the card
+       and then having to print a dead grey button inside it.
+
+       The recommendation is mint and the current plan is violet — different
+       colours, not just different shapes, which is what lets the two sit in
+       one row without either being read as the other. */
+    /* The shade ran out at 62% and the card read as white with a tinted
+       cap. It now carries across the whole card, diagonally, so the
+       recommendation is visible at a glance rather than on inspection. */
+    .plan.best {
+        border-color: #9ee0bc;
+        background: linear-gradient(158deg, #dff7ea 0%, #ecfbf3 42%, #f7fdfa 100%);
+        box-shadow: 0 10px 30px -20px rgba(12, 81, 50, .45);
+    }
+    .plan.best .plan-ico { background: var(--p-success-bg); color: var(--p-success-fg); }
+    .plan.best .plan-badge { background: var(--p-success-bg); color: var(--p-success-fg); }
+    /* The ribbon hangs off the top edge at top: -9px, so it never overlaps the
+       first row and the card needs no clearance at all. The 8px it used to
+       take pushed the price, the button and every tick below the other two
+       cards — first as a margin, then, briefly, as padding. */
+    .plan.current { border: 1.5px solid var(--accent); }
+    /* Violet means "the current thing" on every other screen, and the ring
+       and the badge on the plan you are already on now use it. So the
+       recommendation cannot also be violet — it is a different claim, and it
+       gets the attention tone rather than the accent. */
+    .plan-badge {
+        position: absolute; top: -9px; left: 50%; transform: translateX(-50%); z-index: 20;
+        background: var(--p-attention-bg); color: var(--p-attention-fg);
+        padding: 4px 13px; border-radius: 20px;
+        font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    }
+    .plan-ico { width: 42px; height: 42px; border-radius: 12px; background: #f1f1f1;
+        display: grid; place-items: center; flex: none; }
+    .plan-ico svg { width: 20px; height: 20px; }
+    .plan.current .plan-ico { background: var(--accent); color: #fff; }
+
+    /* The plan you are on: a control that reports rather than offers. */
+    .btn.have {
+        background: #f6f6f7; border-color: var(--p-border); color: var(--p-text-sub);
+        box-shadow: none; cursor: default; font-weight: 550;
+    }
+    .btn.have:hover { background: #f6f6f7; }
+    .feat { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #374151; }
+    .feat svg { flex: none; margin-top: 2px; }
+    .cycle { display: inline-flex; padding: 3px; border-radius: 50px; background: #f1f1f1;
+             border: 1px solid var(--p-border-soft); }
+    .cycle button { display: inline-flex; align-items: center; gap: 7px;
+        padding: 5px 15px; border-radius: 50px; border: 0; background: transparent;
+        font: inherit; font-size: 12px; font-weight: 600; color: var(--p-text-sub); cursor: pointer; }
+    .cycle button.on { background: var(--ink-1); color: #fff; }
+    /* The saving sits on the control that produces it. */
+    .cycle .off-pill {
+        font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 50px;
+        background: var(--p-success-bg); color: var(--p-success-fg);
+    }
+    .cycle button.on .off-pill { background: rgba(255, 255, 255, .16); color: #fff; }
+
+    /* The trial, said once at the top rather than in three lots of small
+       print under three prices. */
+    .trial {
+        display: flex; align-items: flex-start; gap: 11px; max-width: 920px;
+        margin: 0 auto 16px; padding: 12px 14px; border-radius: 12px;
+        background: #f3fafe; border: 1px solid #cfe9f7; color: var(--p-info-fg);
+    }
+    .trial svg { width: 17px; height: 17px; flex: none; margin-top: 1px; }
+    .trial-t { font-size: 13px; font-weight: 650; }
+    .trial-d { display: block; font-size: 12.5px; margin-top: 2px; opacity: .88; }
+    .trial .btn {
+        margin-left: auto; flex: none; background: transparent; border-color: transparent;
+        box-shadow: none; color: inherit; padding: 2px 6px;
+    }
+    .trial .btn:hover { background: rgba(0, 0, 0, .05); }
+    /* The two bands under the plans are cards, not headings floating over
+       content. Each one carries its own title row, so the title and the place
+       it points to are the same object. NB: margin-left/right rather than the
+       `margin: 0 auto` shorthand, which was overriding .mt20 and leaving both
+       headings with no space at all above them. */
+    .band {
+        max-width: 920px; margin: 20px auto 0; background: #fff;
+        border: 1px solid var(--p-border-soft); border-radius: 14px;
+        box-shadow: var(--p-card-shadow); overflow: hidden;
+    }
+    .band-h {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding: 13px 18px; border-bottom: 1px solid var(--p-border-soft);
+    }
+    .sec-h2 { font-size: 14px; font-weight: 650; }
+    /* Quiet, and not blue: the only other blue on this page is a focus ring. */
+    .band-l { font-size: 12.5px; font-weight: 550; color: var(--p-text-sub); text-decoration: none; }
+    .band-l:hover { color: var(--p-text); text-decoration: underline; }
+    /* Narrow, the two of them stop sharing a line rather than each wrapping
+       to two of their own. */
+    @media (max-width: 620px) {
+        .band-h { flex-wrap: wrap; row-gap: 4px; }
+        .band-h .band-l { flex: 1 0 100%; }
+    }
+
+    /* The rating, said once, on the line that names the section. */
+    .stars { display: flex; gap: 2px; color: #e0a106; }
+    .stars svg { width: 14px; height: 14px; }
+    .rev-sum { display: flex; align-items: center; gap: 9px; }
+    .rev-score { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+
+    /* The reviews themselves: two to a page, the rest a swipe or an arrow
+       away — the same shelf the dashboard pages its apps with. */
+    /* The gutters belong to the wrapper, not the track: inside the track
+       they are scrollable space, and the next card shows through them. */
+    .rvs-wrap { position: relative; padding: 16px 46px 0; }
+    .rvs-track {
+        display: flex; gap: 14px; padding: 2px; overflow-x: auto;
+        scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none;
+    }
+    .rvs-track::-webkit-scrollbar { display: none; }
+    .rvs-track:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: -4px; }
+    .rvs-c {
+        flex: 0 0 calc((100% - 14px) / 2); scroll-snap-align: start;
+        border: 1px solid var(--p-border-soft); border-radius: 12px; padding: 15px 16px;
+        background: #fff; display: flex; flex-direction: column;
+    }
+    .rvs-h { display: flex; gap: 11px; align-items: flex-start; }
+    /* No business is named here, so the mark is the trade's initials rather
+       than somebody's logo. */
+    .rvs-ic {
+        width: 34px; height: 34px; border-radius: 9px; flex: none; display: grid;
+        place-items: center; background: var(--accent-soft); color: var(--accent);
+        font-size: 11.5px; font-weight: 700;
+    }
+    .rvs-n { display: block; font-size: 13px; font-weight: 650; line-height: 1.3; }
+    .rvs-d { display: block; font-size: 11.5px; color: var(--p-text-sub); margin-top: 2px; }
+    .rvs-s { margin: 13px 0 10px; }
+    .rvs-s svg { width: 15px; height: 15px; }
+    .rvs-q { font-size: 12.5px; line-height: 1.55; margin: 0; color: var(--p-text); }
+
+    /* The band clips, so the arrows sit just inside its edges. */
+    .rvs-ar {
+        position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+        width: 30px; height: 30px; border-radius: 50%; background: #fff;
+        border: 1px solid var(--p-border); display: grid; place-items: center;
+        cursor: pointer; color: var(--p-text); box-shadow: 0 1px 4px rgba(26, 26, 26, .12);
+    }
+    .rvs-ar:hover { background: #fafafa; }
+    .rvs-ar[disabled] { opacity: .3; cursor: default; box-shadow: none; }
+    .rvs-ar.l { left: 9px; }
+    .rvs-ar.r { right: 9px; }
+    .rvs-ar svg { width: 15px; height: 15px; }
+    .dots { padding-bottom: 16px; margin-top: 2px; }
+
+    /* The comparison table. The first column is the question and the three
+       after it are the answers, so the plan names repeat as column heads
+       rather than as three lists you hold in your head. */
+    .cmp-scroll { overflow-x: auto; }
+    .cmp { width: 100%; border-collapse: collapse; min-width: 560px; }
+    .cmp th, .cmp td { padding: 10px 14px; text-align: left; font-size: 12.5px;
+                       border-bottom: 1px solid var(--p-border-soft); }
+    .cmp thead th { font-size: 12px; font-weight: 650; background: #fafafa;
+                    border-bottom: 1px solid var(--p-border); }
+    .cmp thead th.now { color: var(--accent); }
+    .cmp tbody th { font-weight: 450; color: var(--p-text); }
+    .cmp td { text-align: center; width: 17%; color: var(--p-text-sub); }
+    .cmp tbody tr:last-child th, .cmp tbody tr:last-child td { border-bottom: 0; }
+    .cmp tbody tr:hover { background: #fafafa; }
+    .t-yes { width: 14px; height: 14px; color: var(--p-success-fg); }
+    .t-no { color: var(--p-text-disabled); }
+    .cmp-chev { transition: transform .15s; }
+    #cmpBtn[aria-expanded="true"] .cmp-chev { transform: rotate(180deg); }
+
+    /* The questions people ask before they pay, opened one at a time. */
+    .faq-head { padding: 17px 20px 15px; }
+    .faq-t { font-size: 17px; font-weight: 700; letter-spacing: -.015em; }
+    .faq-ask { font-size: 12.5px; color: var(--p-text-sub); margin: 4px 0 0; }
+    .faq-i { border-top: 1px solid var(--p-border-soft); }
+    .faq-q {
+        width: 100%; display: flex; align-items: center; justify-content: space-between;
+        gap: 16px; padding: 14px 20px; background: none; border: 0; font: inherit;
+        text-align: left; cursor: pointer; font-size: 13px; font-weight: 600;
+        color: var(--p-text);
+    }
+    .faq-q:hover { background: #fafafa; }
+    /* The markup gives these no intrinsic size, so the rule has to. */
+    .faq-chev { flex: none; color: var(--p-text-sub); transition: transform .18s;
+                display: grid; place-items: center; }
+    .faq-chev svg { width: 15px; height: 15px; display: block; }
+    .faq-q[aria-expanded="true"] .faq-chev { transform: rotate(180deg); }
+    .faq-a { padding: 0 20px 15px; font-size: 12.5px; color: var(--p-text-sub);
+             line-height: 1.6; max-width: 780px; }
+    .faq-a.hide { display: none; }
+
+    /* One card to a page once two no longer fit, and the arrows step by
+       that same page. */
+    @media (max-width: 1100px) {
+        .rvs-c { flex-basis: 100%; }
+    }
+
+    @media (max-width: 900px) {
+        .plan-grid { grid-template-columns: 1fr; }
+        .usage { gap: 12px 16px; }
+        .usage-meter { min-width: 100%; order: 3; }
+    }
+</style>
+
+<!-- Traced from resources/js/Pages/Plans.jsx (route "/pricing"). -->
+<main class="page full">
+
+    <div class="center" style="margin-bottom:12px">
+        <h1 style="font-size:24px;font-weight:650">Subscriptions</h1>
+        <p class="sub mt4" style="font-size:12.5px">Choose the perfect plan for your store.
+            Upgrade or downgrade anytime &mdash; billed securely through Shopify.</p>
+    </div>
+
+    <!-- What you are on, in the same card the lock list uses. -->
+    <div class="usage">
+        <span class="usage-badge">Pro</span>
+        <div>
+            <span class="usage-name">Pro plan</span>
+            <span class="usage-sub">Renews 14 November 2026</span>
+        </div>
+        <div class="usage-meter">
+            <div class="between" style="margin-bottom:6px">
+                <span class="sm"><strong>3 of 20</strong> locks used</span>
+                <span class="xs sub">17 remaining</span>
+            </div>
+            <div class="usage-bar"><i style="width:15%"></i></div>
+        </div>
+    </div>
+
+    <div class="trial" id="trialNote">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 1.8M12 16.5v.01"></path>
+        </svg>
+        <span>
+            <span class="trial-t">Every paid plan starts with 7 days free</span>
+            <span class="trial-d">The trial runs on your first subscription, and Shopify only
+                charges you when it ends. Cancel before then and you pay nothing.</span>
+        </span>
+        <button class="btn" id="trialX" aria-label="Dismiss">&#10005;</button>
+    </div>
+
+    <div class="row" style="justify-content:center;margin-bottom:20px">
+        <div class="cycle" id="cycle">
+            <button class="on" data-cycle="m">Monthly</button>
+            <button data-cycle="y">Annually <span class="off-pill">&minus;17%</span></button>
+        </div>
+    </div>
+
+    <div class="plan-grid">
+
+        <div class="plan">
+            <div class="row g8">
+                <span class="plan-ico" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"
+                         stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"></path></svg></span>
+                <span class="strong" style="font-size:15px">Free</span>
+            </div>
+            <p class="xs sub mt4">One lock, for as long as you like</p>
+
+            <div class="mt16">
+                <span style="color:#111827;font-size:24px;font-weight:700;line-height:1">$0</span>
+                <span class="xs sub">/mo</span>
+            </div>
+            <p class="xs sub" style="margin-top:2px;font-weight:500">no card, no expiry</p>
+
+            <button class="btn primary full mt16">Start free</button>
+
+            <div class="stack g8 mt16">
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>1 lock, on any product, collection, page or blog</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Passcode &amp; sign-in access rules</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>1 widget design</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Email support</span>
+            </div>
+        </div>
+
+        <div class="plan current">
+            <div class="row g8">
+                <span class="plan-ico" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linejoin="round"><path d="M12 3l1.9 4.6 5 .4-3.8 3.3 1.2 4.9L12 13.6 7.7 16.2l1.2-4.9L5.1 8l5-.4z"></path></svg></span>
+                <span class="strong" style="font-size:15px">Pro</span>
+                <span class="tag now" style="margin-left:auto">Current plan</span>
+            </div>
+            <p class="xs sub mt4">For stores with a handful of locks</p>
+
+            <div class="mt16">
+                <span class="sub was" style="font-size:14px;text-decoration:line-through;margin-right:8px">$35.99</span>
+                <span class="price" data-m="29.99" data-y="24.90" style="color:#111827;font-size:24px;font-weight:700;line-height:1">$29.99</span>
+                <span class="xs sub">/mo</span>
+            </div>
+            <p class="xs sub bill" data-m="billed monthly" data-y="billed yearly &middot; $299 a year"
+               style="margin-top:2px;font-weight:500">billed monthly</p>
+
+            <button class="btn full have mt16" aria-disabled="true">Your current plan</button>
+
+            <div class="stack g8 mt16">
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Everything in Free</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Secret links &amp; customer tag access</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Hide prices from guests</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Scheduled locks &amp; variant locking</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Priority email support</span>
+            </div>
+        </div>
+
+        <div class="plan best">
+            <span class="plan-badge">BEST VALUE</span>
+            <div class="row g8">
+                <span class="plan-ico" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linejoin="round"><path d="M3 7l4 5 5-7 5 7 4-5v11H3z"></path></svg></span>
+                <span class="strong" style="font-size:15px">Unlimited</span>
+            </div>
+            <p class="xs sub mt4">Everything, with no limit to reach</p>
+
+            <div class="mt16">
+                <span class="price" data-m="99.99" data-y="82.90" style="color:#111827;font-size:24px;font-weight:700;line-height:1">$99.99</span>
+                <span class="xs sub">/mo</span>
+            </div>
+            <p class="xs sub bill" data-m="billed monthly" data-y="billed yearly &middot; $995 a year" style="margin-top:2px;font-weight:500">billed monthly</p>
+
+            <button class="btn primary full mt16">Select plan</button>
+
+            <div class="stack g8 mt16">
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Everything in Pro</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Unlimited content locks</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Lock the entire store &amp; checkout</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Location &amp; IP based rules</span>
+                <span class="feat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0c5132"
+                    stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg>Dedicated priority support</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- The Free tier is offered separately, and downgrading to it needs a
+         second click because it cancels the subscription immediately. -->
+
+    <!-- Paying for what you use. The calculator is the point: per-unit
+         pricing you cannot put your own number into is just a smaller tier. -->
+    <!-- Three feature lists cannot be read against each other; a table can. -->
+    <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn" id="cmpBtn" aria-expanded="false" aria-controls="cmp">
+            Compare plans
+            <svg class="cmp-chev" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+        </button>
+    </div>
+
+    <section class="band hide" id="cmp" style="margin-top:14px">
+        <div class="band-h">
+            <span class="sec-h2">Every plan, side by side</span>
+            <span class="xs sub">Your plan: <strong>Pro</strong></span>
+        </div>
+        <div class="cmp-scroll">
+            <table class="cmp">
+                <thead>
+                    <tr>
+                        <th scope="col">Feature</th>
+                        <th scope="col">Free</th>
+                        <th scope="col" class="now">Pro</th>
+                        <th scope="col">Unlimited</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <tr><th scope="row">Locks you can have</th><td>1</td><td>20</td><td>Unlimited</td></tr>
+                <tr><th scope="row">Widget designs</th><td>1</td><td>20</td><td>Unlimited</td></tr>
+                <tr><th scope="row">Products, collections, pages, blogs</th><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td></tr>
+                <tr><th scope="row">Passcode and sign-in conditions</th><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td></tr>
+                <tr><th scope="row">Customer tag, email list, secret link</th><td><span class="t-no" aria-label="Not included">&mdash;</span></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td></tr>
+                <tr><th scope="row">Country and age conditions</th><td><span class="t-no" aria-label="Not included">&mdash;</span></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td></tr>
+                <tr><th scope="row">Hide prices from guests</th><td><span class="t-no" aria-label="Not included">&mdash;</span></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td></tr>
+                <tr><th scope="row">Scheduled locks and variant locking</th><td><span class="t-no" aria-label="Not included">&mdash;</span></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td></tr>
+                <tr><th scope="row">Lock the entire store or checkout</th><td><span class="t-no" aria-label="Not included">&mdash;</span></td><td><span class="t-no" aria-label="Not included">&mdash;</span></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td></tr>
+                <tr><th scope="row">Shopify Flow triggers and actions</th><td><span class="t-no" aria-label="Not included">&mdash;</span></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td><td><svg class="t-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M5 13l4 4L19 7"></path></svg></td></tr>
+                <tr><th scope="row">Support</th><td>Email</td><td>Priority email</td><td>Priority, 24h</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Reviews. The rating, the trades and the quotes are placeholders for
+         what the Shopify App Store listing already holds; no business is
+         named, so the mark on each card is the trade's initials. -->
+    <section class="band">
+        <div class="band-h">
+            <span class="sec-h2">What merchants say</span>
+            <span class="rev-sum">
+                <span class="rev-score">4.9</span>
+                <span class="stars" data-stars="5" role="img" aria-label="Rated 4.9 out of 5"></span>
+                <span class="xs sub">128 reviews</span>
+            </span>
+            <a class="band-l" href="#">Read them on the App Store &rarr;</a>
+        </div>
+
+        <div class="rvs-wrap">
+            <button class="rvs-ar l" id="rvPrev" aria-label="Previous reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <div class="rvs-track" id="rvTrack" tabindex="0" aria-label="Merchant reviews">
+            <div class="rvs-c">
+                <div class="rvs-h">
+                    <span class="rvs-ic" aria-hidden="true">AW</span>
+                    <span>
+                        <span class="rvs-n">Apparel wholesaler</span>
+                        <span class="rvs-d">United Kingdom</span>
+                    </span>
+                </div>
+                <span class="stars rvs-s" data-stars="5" role="img"
+                      aria-label="Rated 5 out of 5"></span>
+                <p class="rvs-q">Set up a trade catalogue in an afternoon. Our stockists see the prices, everyone else sees a sign-in.</p>
+            </div>
+            <div class="rvs-c">
+                <div class="rvs-h">
+                    <span class="rvs-ic" aria-hidden="true">HS</span>
+                    <span>
+                        <span class="rvs-n">Homeware store</span>
+                        <span class="rvs-d">Germany</span>
+                    </span>
+                </div>
+                <span class="stars rvs-s" data-stars="5" role="img"
+                      aria-label="Rated 5 out of 5"></span>
+                <p class="rvs-q">The passcode list meant one code per customer instead of one code for the whole mailing list.</p>
+            </div>
+            <div class="rvs-c">
+                <div class="rvs-h">
+                    <span class="rvs-ic" aria-hidden="true">OB</span>
+                    <span>
+                        <span class="rvs-n">Outdoor brand</span>
+                        <span class="rvs-d">Australia</span>
+                    </span>
+                </div>
+                <span class="stars rvs-s" data-stars="5" role="img"
+                      aria-label="Rated 5 out of 5"></span>
+                <p class="rvs-q">We locked the whole store while we rebuilt it. The popup looked like ours, not like an app.</p>
+            </div>
+            <div class="rvs-c">
+                <div class="rvs-h">
+                    <span class="rvs-ic" aria-hidden="true">JS</span>
+                    <span>
+                        <span class="rvs-n">Jewellery studio</span>
+                        <span class="rvs-d">Canada</span>
+                    </span>
+                </div>
+                <span class="stars rvs-s" data-stars="5" role="img"
+                      aria-label="Rated 5 out of 5"></span>
+                <p class="rvs-q">A midnight drop without me being awake for it &mdash; the schedule takes the lock off on its own.</p>
+            </div>
+            <div class="rvs-c">
+                <div class="rvs-h">
+                    <span class="rvs-ic" aria-hidden="true">SS</span>
+                    <span>
+                        <span class="rvs-n">Supplements seller</span>
+                        <span class="rvs-d">United States</span>
+                    </span>
+                </div>
+                <span class="stars rvs-s" data-stars="4" role="img"
+                      aria-label="Rated 4 out of 5"></span>
+                <p class="rvs-q">Does what we need on the storefront. Locking checkout itself wants Shopify Plus, which we are not on yet.</p>
+            </div>
+            </div>
+            <button class="rvs-ar r" id="rvNext" aria-label="More reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
+        <div class="dots" id="rvDots" role="tablist" aria-label="Review pages"></div>
+    </section>
+
+    <!-- The questions that decide whether a merchant pays. Every answer is
+         something the app does today. -->
+    <section class="band" style="margin-bottom:10px">
+        <div class="faq-head">
+            <span class="faq-t">Frequently asked questions</span>
+            <p class="faq-ask">Don&rsquo;t see your answer?
+                <a class="band-l" href="#" style="color:var(--link)">Ask us anything &rarr;</a></p>
+        </div>
+
+        <div class="faq-i">
+            <button class="faq-q" aria-expanded="false" aria-controls="faqA0">
+                Do I have to edit my theme?
+                <span class="faq-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+            </button>
+            <div class="faq-a hide" id="faqA0">No. Airo runs through a theme app embed &mdash; you switch it on once in the theme editor, and setup links you straight to it.</div>
+        </div>
+        <div class="faq-i">
+            <button class="faq-q" aria-expanded="false" aria-controls="faqA1">
+                How am I billed?
+                <span class="faq-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+            </button>
+            <div class="faq-a hide" id="faqA1">Through Shopify. The charge appears on your Shopify invoice, and every paid plan starts with a 7-day free trial.</div>
+        </div>
+        <div class="faq-i">
+            <button class="faq-q" aria-expanded="false" aria-controls="faqA2">
+                What happens if I downgrade?
+                <span class="faq-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+            </button>
+            <div class="faq-a hide" id="faqA2">Nothing is deleted. A plan sets how many locks you can have; past that the app stops you creating more rather than removing what you already built.</div>
+        </div>
+        <div class="faq-i">
+            <button class="faq-q" aria-expanded="false" aria-controls="faqA3">
+                Will Google index a locked page?
+                <span class="faq-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+            </button>
+            <div class="faq-a hide" id="faqA3">Only if you let it. Each lock has <strong>Hide from search engines</strong>, which adds a noindex tag to the page it protects.</div>
+        </div>
+        <div class="faq-i">
+            <button class="faq-q" aria-expanded="false" aria-controls="faqA4">
+                Can several locks share one design?
+                <span class="faq-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+            </button>
+            <div class="faq-a hide" id="faqA4">Yes. A widget holds the colours and shape, and any lock can use it &mdash; while the wording can still differ lock by lock.</div>
+        </div>
+        <div class="faq-i">
+            <button class="faq-q" aria-expanded="false" aria-controls="faqA5">
+                Does it work at checkout?
+                <span class="faq-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+            </button>
+            <div class="faq-a hide" id="faqA5">On Shopify Plus, yes: a checkout block shows the lock&rsquo;s message, and a validation function stops the order being placed.</div>
+        </div>
+    </section>
+</main>
+
+<script src="assets/app.js"></script>
+<script>
+    mountChrome('plans');
+    /* The toggle used to move a pill and leave the prices alone, which made
+       the one control on the page that promises a saving unable to show it.
+       Each price and each billing line carries both answers. */
+    function setCycle(key) {
+        document.querySelectorAll('.cycle button').forEach((x) =>
+            x.classList.toggle('on', x.dataset.cycle === key));
+        document.querySelectorAll('.price').forEach((p) => { p.textContent = '\u0024' + p.dataset[key]; });
+        document.querySelectorAll('.bill').forEach((p) => { p.innerHTML = p.dataset[key]; });
+        // The promotional price is a monthly offer; yearly has its own saving.
+        document.querySelectorAll('.was').forEach((w) => w.classList.toggle('hide', key === 'y'));
+    }
+    document.getElementById('cycle').addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (b) setCycle(b.dataset.cycle);
+    });
+
+    const cmpBtn = document.getElementById('cmpBtn');
+    cmpBtn.addEventListener('click', () => {
+        const open = document.getElementById('cmp').classList.toggle('hide') === false;
+        cmpBtn.setAttribute('aria-expanded', String(open));
+    });
+
+    /* The review shelf. A page is whatever is in view, so the dots count
+       themselves rather than assuming two. */
+    {
+        const track = document.getElementById('rvTrack');
+        const dots = document.getElementById('rvDots');
+        const prev = document.getElementById('rvPrev');
+        const next = document.getElementById('rvNext');
+
+        const max = () => track.scrollWidth - track.clientWidth;
+        const cards = () => track.querySelectorAll('.rvs-c');
+        const gap = () => parseFloat(getComputedStyle(track).columnGap) || 0;
+        /* How many whole cards a page holds, and so how many pages there are.
+           A ratio of widths rounds the wrong way once padding and gaps are
+           in it. */
+        const per = () => Math.max(1,
+            Math.round((track.clientWidth + gap()) / (cards()[0].offsetWidth + gap())));
+        const pages = () => Math.max(1, Math.ceil(cards().length / per()));
+        /* The last page is usually shorter, so the dot comes from how far
+           along the scroll is rather than from dividing by a width it has
+           not got. */
+        const here = () => (max() <= 0 ? 0
+            : Math.round(track.scrollLeft / max() * (pages() - 1)));
+
+        function build() {
+            const n = pages();
+            if (dots.children.length !== n) {
+                dots.innerHTML = Array.from({ length: n }, (_, i) =>
+                    '<button class="dot" role="tab" aria-label="Page ' + (i + 1) + '"></button>').join('');
+            }
+            paint();
+        }
+        function paint() {
+            const at = here();
+            [...dots.children].forEach((d, i) => {
+                d.classList.toggle('on', i === at);
+                d.setAttribute('aria-selected', i === at);
+            });
+            prev.disabled = track.scrollLeft < 4;
+            next.disabled = track.scrollLeft > max() - 4;
+        }
+        const step = (dir) => track.scrollBy({ left: dir * track.clientWidth });
+        prev.addEventListener('click', () => step(-1));
+        next.addEventListener('click', () => step(1));
+        dots.addEventListener('click', (e) => {
+            const i = [...dots.children].indexOf(e.target.closest('.dot'));
+            if (i >= 0) track.scrollTo({ left: Math.min(i * track.clientWidth, max()) });
+        });
+        track.addEventListener('scroll', paint, { passive: true });
+        window.addEventListener('resize', build);
+        build();
+    }
+
+    /* One question at a time, and clicking the open one closes it. */
+    document.querySelectorAll('.faq-q').forEach((b) => {
+        b.addEventListener('click', () => {
+            const open = b.getAttribute('aria-expanded') === 'true';
+            document.querySelectorAll('.faq-q').forEach((x) => {
+                x.setAttribute('aria-expanded', 'false');
+                document.getElementById(x.getAttribute('aria-controls')).classList.add('hide');
+            });
+            if (!open) {
+                b.setAttribute('aria-expanded', 'true');
+                document.getElementById(b.getAttribute('aria-controls')).classList.remove('hide');
+            }
+        });
+    });
+
+    /* Star rows are written once here rather than thirty times over in the
+       markup; each row says how many it wants. */
+    document.querySelectorAll('[data-stars]').forEach((el) => {
+        const got = Number(el.dataset.stars);
+        el.innerHTML = Array.from({ length: 5 }, (_, i) => (i < got
+            ? '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">')
+            + '<path d="M12 3l2.6 5.6 6.1.8-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.4l6.1-.8z"/></svg>').join('');
+    });
+
+    document.getElementById('trialX').addEventListener('click',
+        () => document.getElementById('trialNote').classList.add('hide'));
+</script>
+</html>

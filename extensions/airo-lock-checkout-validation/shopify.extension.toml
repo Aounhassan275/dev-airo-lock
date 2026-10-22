@@ -1,0 +1,17 @@
+api_version = "2026-04"
+
+[[extensions]]
+name = "Airo Access Lock & Control Checkout Validation"
+handle = "airo-lock-checkout-validation"
+uid = "e2abb82a-9101-e894-eb18-3b105769785889763068"
+type = "function"
+description = "Plus-only hard enforcement of Airo Access Lock & Control checkout access rules."
+
+  [[extensions.targeting]]
+  target = "cart.validations.generate.run"
+  input_query = "src/run.graphql"
+  export = "cart-validations-generate-run"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"

@@ -1,0 +1,32 @@
+api_version = "2025-10"
+
+[[extensions]]
+name = "Airo Access Lock & Control grant access"
+uid = "39696695-7df9-cf83-1ce6-aaa2ab86cc2ddbeb85fb"
+type = "flow_action"
+handle = "airo-lock-grant-access"
+description = "Tags a customer so they pass the chosen Airo Access Lock & Control rule. Optionally time-limited."
+runtime_url = "https://lock.airoapps.com/flow/action/grant-access"
+
+  [settings]
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "customerId"
+    name = "Customer ID"
+    description = "Numeric Shopify customer id to grant access to."
+    required = true
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "ruleId"
+    name = "Rule ID"
+    description = "Internal Airo Access Lock & Control rule id the customer should pass."
+    required = true
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "durationHours"
+    name = "Duration (hours)"
+    description = "Optional. If set, the grant is revoked after this many hours."
+    required = false

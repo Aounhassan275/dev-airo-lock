@@ -1,0 +1,36 @@
+/node_modules
+/vendor
+/public/storage
+/storage/*.key
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/logs/*
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+.vscode/
+.idea/
+.DS_Store
+# NOTE: public/build is intentionally COMMITTED. The VPS runs Node 18, but Vite 7
+# needs Node 20.19+, so `vite build` fails on deploy and the frontend never
+# rebuilds. Committing the compiled assets makes `git reset` ship them directly.
+# Once the VPS is upgraded to Node 20+, this can be re-ignored.
+# /public/build
+/public/hot
+auth.json
+phputils.json
+
+# Shopify
+.shopify/
+extensions/*/node_modules/
+extensions/*/dist/
+extensions/*/generated/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env.*
+!.env.example

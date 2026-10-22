@@ -1,0 +1,34 @@
+query CartValidationsGenerateRunInput {
+    cart {
+        accessCode: attribute(key: "_airo_access_code") {
+            value
+        }
+        buyerIdentity {
+            isAuthenticated
+            email
+            customer {
+                id
+                email
+            }
+        }
+        deliveryGroups {
+            deliveryAddress {
+                countryCode
+                provinceCode
+                city
+            }
+        }
+        billingAddress {
+            countryCode
+            provinceCode
+            city
+        }
+    }
+    shop {
+        # Schedule gating is done server-side (Laravel writes a checkout lock
+        # to this metafield only while active), so no clock is needed here.
+        metafield(namespace: "access_control", key: "checkout_rule") {
+            value
+        }
+    }
+}

@@ -1,0 +1,34 @@
+api_version = "2025-10"
+
+[[extensions]]
+name = "Airo Access Lock & Control request approved"
+uid = "7cc13037-eb28-e60a-0471-c672e2ccf8ad98af5baa"
+type = "flow_trigger"
+handle = "airo-lock-request-approved"
+description = "Fires when a merchant approves a Request Credentials submission in the Airo Access Lock & Control admin."
+
+  [settings]
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "requestId"
+    name = "Request ID"
+    description = "Internal Airo Access Lock & Control request id."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "lockId"
+    name = "Lock ID"
+    description = "Internal Airo Access Lock & Control lock id."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "customerId"
+    name = "Customer ID"
+    description = "Shopify customer id created or matched on approval."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "email"
+    name = "Email"
+    description = "Approved requester email."

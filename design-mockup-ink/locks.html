@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locks &mdash; Airo Access Lock</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+    /* A list page needs context, not a wizard, so the black panel lies flat
+       across the top instead of standing beside the work. Same surface, same
+       accent, same summary rows. */
+    /* .panel is a column by default; lying it flat needs the direction reset. */
+    /* Plan and usage, on a card like every other card. The old strip put
+       dark-rail type on black, which no one could read. */
+    .plan {
+        display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+        padding: 15px 18px; margin-bottom: 14px;
+        border: 1px solid var(--p-border); border-radius: 14px; background: #fff;
+        box-shadow: var(--p-card-shadow);
+    }
+    .plan-badge {
+        font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+        padding: 4px 10px; border-radius: 7px; background: var(--accent); color: #fff;
+        flex: none;
+    }
+    .plan-who { margin-left: -12px; }
+    .plan-name { display: block; font-size: 13px; font-weight: 650; }
+    .plan-sub { display: block; font-size: 12px; color: var(--p-text-sub); margin-top: 1px; }
+    .plan-meter { flex: 1; min-width: 240px; }
+    .plan-bar { height: 6px; border-radius: 20px; background: #e3e3e3; overflow: hidden; }
+    .plan-bar > i { display: block; height: 100%; border-radius: 20px; background: var(--accent); }
+
+    /* One summary of one store, so one card — divided, not scattered. */
+    .stat-row {
+        display: grid; grid-template-columns: repeat(4, 1fr);
+        background: #fff; border: 1px solid var(--p-border-soft); border-radius: 12px;
+        box-shadow: var(--p-card-shadow); overflow: hidden;
+    }
+
+    /* How many of the visitors a lock stopped got through it. A bar rather
+       than a second number: the question is a proportion. */
+    /* Narrower than its columns, the table scrolls rather than hiding the
+       end of every row behind the card's edge. */
+    .t-scroll { overflow-x: auto; }
+    .t-scroll .idx { min-width: 1000px; }
+    /* The frame is about 293px narrower than the window, so the table has the
+       room for its columns from roughly 1200px up; below that it scrolls
+       rather than squeezing every cell into two lines. */
+    @media (min-width: 1200px) { .t-scroll .idx { min-width: 0; } }
+
+    .act-bar { display: block; height: 4px; border-radius: 20px; background: #e9e9e9; }
+    .act-bar > i { display: block; height: 100%; border-radius: 20px; background: var(--p-success-fg); }
+    .th-note { font-weight: 450; color: var(--p-text-disabled); margin-left: 5px; }
+
+    /* A search box takes what it needs, not what the row has left over. */
+    .filters .searchbar { max-width: 420px; }
+    .searchbar input {
+        border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px;
+        width: 100%; min-width: 0; color: var(--p-text);
+    }
+    .searchbar input::-webkit-search-cancel-button { cursor: pointer; }
+
+    /* The bulk row replaces the filters while a selection exists, rather than
+       appearing under them: the two sets of controls do not apply at once. */
+    .bulk {
+        display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+        border-bottom: 1px solid var(--p-border-soft); background: var(--v-50);
+    }
+
+    .t-none td { padding: 34px 16px; text-align: center; }
+    /* Narrow, the three of them stop sharing one line: the tabs and Sort keep
+       the first, the search box takes the second whole. */
+    @media (max-width: 760px) {
+        .filters { flex-wrap: wrap; }
+        .filters .tabs { order: 1; }
+        .filters .btn, .filters .select { order: 2; margin-left: auto; }
+        .filters .searchbar { order: 3; flex: 1 0 100%; max-width: none; }
+    }
+    /* app.css gives .stat its own border, radius and shadow for the grid of
+       separate cards it was written for; inside one card they all come off. */
+    .stat-row .stat {
+        border: 0; border-radius: 0; box-shadow: none; background: transparent;
+        padding: 13px 16px; display: flex; align-items: center; gap: 12px;
+    }
+    .stat-row .stat:hover { border-color: transparent; box-shadow: none; }
+    .stat-row .stat + .stat { border-left: 1px solid var(--p-border-soft); }
+    .stat-ico {
+        width: 32px; height: 32px; border-radius: 9px; background: #f1f1f1;
+        border: 0; display: grid; place-items: center; flex: none; color: var(--ink-1);
+    }
+    .stat-ico svg { width: 17px; height: 17px; }
+    /* Tinted by meaning, so the row reads before you read it. */
+    .stat-ico.good { background: var(--p-success-bg); color: var(--p-success-fg); }
+    .stat-ico.warn { background: var(--p-warning-bg); color: var(--p-warning-fg); }
+    .stat-ico.info { background: var(--p-info-bg); color: var(--p-info-fg); }
+    .stat-ico.brand { background: var(--v-100); color: var(--v-800); }
+
+    /* Number first, then what it counts. */
+    .stat-v { font-size: 21px; font-weight: 700; line-height: 25px; display: block;
+              letter-spacing: -.015em; }
+    .stat-l { display: block; font-size: 12.5px; font-weight: 550; }
+    .stat-note { display: block; font-size: 11.5px; color: var(--p-text-sub); margin-top: 2px; }
+    @media (max-width: 900px) {
+        .stat-row { grid-template-columns: repeat(2, 1fr); }
+        .plan { gap: 12px 14px; }
+        .plan-who { margin-left: 0; flex: 1; }
+        /* Plan, then meter, then the way to change it. */
+        .plan-meter { min-width: 100%; order: 3; }
+        .plan .btn { order: 4; width: 100%; text-align: center; }
+    }
+    /* Too little width for a sentence under each number. */
+    /* Four cells across a card this wide leaves no room for a sentence under
+       each number; the number and what it counts are the point. */
+    @media (max-width: 1180px) { .stat-note { display: none; } }
+
+    @media (max-width: 900px) {
+        /* Two across, so the rule between them runs the other way as well. */
+        .stat:nth-child(3) { border-left: 0; }
+        .stat:nth-child(n+3) { border-top: 1px solid var(--p-border-soft); }
+    }
+    @media (max-width: 700px) {
+        .stat { padding: 12px 13px; gap: 11px; }
+        .stat-note { display: none; }
+        .stat-ico { width: 32px; height: 32px; border-radius: 9px; }
+        .stat-ico svg { width: 17px; height: 17px; }
+    }
+</style>
+
+<main class="page full">
+
+    <div class="between wrap g12" style="margin-bottom:16px">
+        <div>
+            <h1 style="font-size:20px;font-weight:650">Locks</h1>
+            <p class="sm sub mt4">Secure products, collections, pages and blogs with custom access rules.</p>
+        </div>
+        <a class="btn primary" href="lock-builder.html">&#43; Create new lock</a>
+    </div>
+
+    <!-- Plan and usage. One card: what you are on, how much of it is spent,
+         and the way to change it. -->
+    <div class="plan">
+        <span class="plan-badge">Pro</span>
+        <div class="plan-who">
+            <span class="plan-name">Pro plan</span>
+            <span class="plan-sub">Renews 14 November 2026</span>
+        </div>
+
+        <div class="plan-meter">
+            <div class="between" style="margin-bottom:6px">
+                <span class="sm"><strong id="qUsed">3 of 20</strong> locks used</span>
+                <span class="xs sub" id="qLeft">17 remaining</span>
+            </div>
+            <div class="plan-bar"><i id="qBar" style="width:15%"></i></div>
+        </div>
+
+        <a class="btn" href="plans.html">View plans</a>
+    </div>
+
+    <!-- Three counts that do not repeat the meter above them. -->
+    <div class="stat-row">
+        <div class="stat">
+            <span class="stat-ico good" aria-hidden="true">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle>
+                <path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg></span>
+            <div class="grow">
+                <span class="stat-v">2</span>
+                <span class="stat-l">Active locks</span>
+                <span class="stat-note">Running on your storefront now</span>
+            </div>
+        </div>
+        <div class="stat">
+            <span class="stat-ico warn" aria-hidden="true">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 10.7a2 2 0 002.8 2.8"></path>
+                <path d="M16.7 16.7A9.5 9.5 0 0112 18c-5 0-9-6-9-6a16 16 0 014.1-4.8"></path></svg></span>
+            <div class="grow">
+                <span class="stat-v">1</span>
+                <span class="stat-l">Inactive locks</span>
+                <span class="stat-note">Saved, not enforcing anything</span>
+            </div>
+        </div>
+        <div class="stat">
+            <span class="stat-ico info" aria-hidden="true">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="2.5"></rect>
+                <path d="M8 10.5V7.5a4 4 0 017.5-2"></path></svg></span>
+            <div class="grow">
+                <span class="stat-v">653</span>
+                <span class="stat-l">Unlocked</span>
+                <span class="stat-note" id="seenNote">Of 1,752 visitors stopped &middot; 30 days</span>
+            </div>
+        </div>
+        <div class="stat">
+            <span class="stat-ico brand" aria-hidden="true">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.4 8.3-8 9-4.6-.7-8-4-8-9V6z"></path>
+                <path d="M9 12l2 2 4-4"></path></svg></span>
+            <div class="grow">
+                <span class="stat-v">64</span>
+                <span class="stat-l">Items secured</span>
+                <span class="stat-note">Products, pages and collections</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt16" style="padding:0;overflow:hidden">
+        <div class="filters">
+            <div class="tabs">
+                <button class="tab on">All</button>
+                <button class="tab">Active</button>
+                <button class="tab">Inactive</button>
+            </div>
+            <div class="searchbar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+                <input id="q" type="search" placeholder="Search locks&hellip;" aria-label="Search locks">
+            </div>
+            <select class="select" id="sort" aria-label="Sort locks" style="width:auto">
+                <option value="updated">Recently updated</option>
+                <option value="name">Name A&ndash;Z</option>
+                <option value="activity">Most activity</option>
+                <option value="items">Most items</option>
+            </select>
+        </div>
+
+        <!-- Only while something is selected: the row checkboxes had nothing
+             to be selected for. -->
+        <div class="bulk hide" id="bulk">
+            <span class="strong" id="bulkN">0 selected</span>
+            <div class="row g8" style="margin-left:auto">
+                <button class="btn" data-bulk="on">Activate</button>
+                <button class="btn" data-bulk="off">Deactivate</button>
+                <button class="btn danger" data-bulk="del">Delete</button>
+                <button class="btn plain" id="bulkX">Clear</button>
+            </div>
+        </div>
+
+        <div class="t-scroll">
+        <table class="idx">
+            <thead>
+                <tr>
+                    <th style="width:26px"><input type="checkbox"></th>
+                    <th>Lock name</th><th>Type</th><th>Items</th>
+                    <th>Activity <span class="th-note">30 days</span></th>
+                    <th>Dates</th><th>Status</th><th class="end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-status="active" data-name="Wholesale catalogue" data-seen="1284" data-updated="3"
+                    data-activity="312" data-items="42">
+                    <td><input type="checkbox" aria-label="Select Wholesale catalogue"></td>
+                    <td>
+                        <div class="stack" style="gap:3px">
+                            <span class="row g8">
+                                <a href="lock-preview.html" class="strong" style="color:var(--p-text)">Wholesale catalogue</a>
+                                <span class="xs sub">#14</span>
+                            </span>
+                            <span class="xs sub">Trade pricing for approved stockists only</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stack g4">
+                            <div class="row g4">
+                                <span class="pill collection">2 Collections</span>
+                                <span class="pill product">Product</span>
+                            </div>
+                            <span class="xs sub">Content lock</span>
+                        </div>
+                    </td>
+                    <td><span class="row g8"><span class="count-chip">42</span>
+                        <span class="xs sub">items</span></span></td>
+                    <td>
+                        <div class="stack" style="gap:5px;min-width:118px">
+                            <span class="sm"><strong>312</strong> unlocked</span>
+                            <span class="act-bar" aria-hidden="true"><i style="width:24%"></i></span>
+                            <span class="xs sub">of 1,284 visitors &middot; 24%</span>
+                        </div>
+                    </td>
+                    <td><div class="stack" style="gap:2px">
+                        <span class="sm">Today</span>
+                        <span class="xs sub">Updated &middot; created 14 Sept 2026</span></div></td>
+                    <td><button class="knob" aria-label="Active"></button></td>
+                    <td class="end"><span class="row g8" style="justify-content:flex-end">
+                        <a class="btn icon" href="lock-builder.html?id=14" aria-label="Edit">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8"><path d="M14 6l4 4L8 20H4v-4z"></path></svg></a>
+                        <button class="btn icon" aria-label="Duplicate">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                            <path d="M5 15V5a2 2 0 012-2h8"></path></svg></button>
+                        <button class="btn icon" aria-label="Delete">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"></path></svg></button>
+                    </span></td>
+                </tr>
+                <tr data-status="active" data-name="Members area" data-seen="468" data-updated="2"
+                    data-activity="341" data-items="18">
+                    <td><input type="checkbox" aria-label="Select Members area"></td>
+                    <td>
+                        <div class="stack" style="gap:3px">
+                            <span class="row g8">
+                                <a href="lock-preview.html" class="strong" style="color:var(--p-text)">Members area</a>
+                                <span class="xs sub">#15</span>
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stack g4">
+                            <div class="row g4">
+                                <span class="pill page">4 Pages</span>
+                                <span class="pill blog">Blog</span>
+                                <span class="pill neutral">+1</span>
+                            </div>
+                            <span class="xs sub">Content lock</span>
+                        </div>
+                    </td>
+                    <td><span class="row g8"><span class="count-chip">18</span>
+                        <span class="xs sub">items</span></span></td>
+                    <td>
+                        <div class="stack" style="gap:5px;min-width:118px">
+                            <span class="sm"><strong>341</strong> unlocked</span>
+                            <span class="act-bar" aria-hidden="true"><i style="width:73%"></i></span>
+                            <span class="xs sub">of 468 visitors &middot; 73%</span>
+                        </div>
+                    </td>
+                    <td><div class="stack" style="gap:2px">
+                        <span class="sm">Yesterday</span>
+                        <span class="xs sub">Updated &middot; created 2 Oct 2026</span></div></td>
+                    <td><button class="knob" aria-label="Active"></button></td>
+                    <td class="end"><span class="row g8" style="justify-content:flex-end">
+                        <a class="btn icon" href="lock-builder.html?id=15" aria-label="Edit">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8"><path d="M14 6l4 4L8 20H4v-4z"></path></svg></a>
+                        <button class="btn icon" aria-label="Duplicate">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                            <path d="M5 15V5a2 2 0 012-2h8"></path></svg></button>
+                        <button class="btn icon" aria-label="Delete">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"></path></svg></button>
+                    </span></td>
+                </tr>
+                <tr data-status="inactive" data-name="Spring preview" data-seen="0" data-updated="1"
+                    data-activity="0" data-items="4">
+                    <td><input type="checkbox" aria-label="Select Spring preview"></td>
+                    <td>
+                        <div class="stack" style="gap:2px">
+                            <div class="row g8">
+                                <a href="lock-preview.html" class="strong" style="color:var(--p-text)">Spring preview</a>
+                                <span class="tag">Scheduled 1 Nov</span>
+                                <span class="xs sub">#16</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stack g4">
+                            <div class="row g4"><span class="pill shop">Entire store</span></div>
+                            <span class="xs sub">Hide price</span>
+                        </div>
+                    </td>
+                    <td><span class="row g8"><span class="count-chip">4</span>
+                        <span class="xs sub">items</span></span></td>
+                    <td><div class="stack" style="gap:3px;min-width:118px">
+                            <span class="sm sub">&mdash;</span>
+                            <span class="xs sub">Starts 1 Nov</span>
+                        </div></td>
+                    <td><div class="stack" style="gap:2px">
+                        <span class="sm">11 Oct 2026</span>
+                        <span class="xs sub">Updated &middot; created 11 Oct 2026</span></div></td>
+                    <td><button class="knob off" aria-label="Inactive"></button></td>
+                    <td class="end"><span class="row g8" style="justify-content:flex-end">
+                        <a class="btn icon" href="lock-builder.html?id=16" aria-label="Edit">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8"><path d="M14 6l4 4L8 20H4v-4z"></path></svg></a>
+                        <button class="btn icon" aria-label="Duplicate">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                            <path d="M5 15V5a2 2 0 012-2h8"></path></svg></button>
+                        <button class="btn icon" aria-label="Delete">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"></path></svg></button>
+                    </span></td>
+                </tr>
+                <tr class="t-none hide" id="noRows">
+                    <td colspan="8">
+                        <span class="strong">No locks match that</span>
+                        <p class="sm sub mt4">Try a different word, or show all locks.</p>
+                        <button class="btn mt12" id="clearF">Clear filters</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+</main>
+
+<script src="assets/app.js"></script>
+<script>
+    mountChrome('locks');
+    document.querySelectorAll('.knob').forEach((k) =>
+        k.addEventListener('click', () => k.classList.toggle('off')));
+
+    /* ------------------------------------------------- the table works -- */
+    const $ = (id) => document.getElementById(id);
+    const body = document.querySelector('tbody');
+    const rows = [...body.querySelectorAll('tr[data-name]')];
+    const all = document.querySelector('thead input[type="checkbox"]');
+    let tab = 'all';
+
+    const shown = () => rows.filter((r) => !r.classList.contains('hide'));
+    const picked = () => shown().filter((r) => r.querySelector('input').checked);
+
+    /* The figures above the table are the same three rows counted, so they
+       move when a lock does. */
+    const CAP = 20;
+    function counts() {
+        const on = rows.filter((r) => r.dataset.status === 'active').length;
+        const v = document.querySelectorAll('.stat-v');
+        v[0].textContent = on;
+        v[1].textContent = rows.length - on;
+        /* Items secured is the same rows added up, so it is added up. */
+        v[3].textContent = rows.reduce((n, r) => n + (+r.dataset.items), 0);
+        const got = rows.reduce((n, r) => n + (+r.dataset.activity), 0);
+        const seen = rows.reduce((n, r) => n + (+r.dataset.seen), 0);
+        v[2].textContent = got.toLocaleString();
+        $('seenNote').innerHTML = 'Of ' + seen.toLocaleString()
+            + ' visitors stopped · 30 days';
+
+        $('qUsed').textContent = rows.length + ' of ' + CAP;
+        $('qLeft').textContent = (CAP - rows.length) + ' remaining';
+        $('qBar').style.width = Math.round(rows.length / CAP * 100) + '%';
+    }
+
+    function paint() {
+        const term = $('q').value.trim().toLowerCase();
+        rows.forEach((r) => {
+            const hit = !term || r.textContent.toLowerCase().includes(term);
+            const inTab = tab === 'all' || r.dataset.status === tab;
+            r.classList.toggle('hide', !(hit && inTab));
+            if (r.classList.contains('hide')) r.querySelector('input').checked = false;
+        });
+        $('noRows').classList.toggle('hide', shown().length > 0);
+
+        const sel = picked().length;
+        $('bulk').classList.toggle('hide', sel === 0);
+        document.querySelector('.filters').classList.toggle('hide', sel > 0);
+        $('bulkN').textContent = sel + ' selected';
+        all.checked = sel > 0 && sel === shown().length;
+        all.indeterminate = sel > 0 && sel < shown().length;
+        counts();
+    }
+
+    function sort() {
+        const by = $('sort').value;
+        const key = (r) => (by === 'name' ? r.dataset.name : +r.dataset[by]);
+        const order = by === 'name' ? 1 : -1;
+        [...rows].sort((a, b) => (key(a) > key(b) ? order : key(a) < key(b) ? -order : 0))
+            .forEach((r) => body.insertBefore(r, $('noRows')));
+    }
+
+    document.querySelector('.tabs').addEventListener('click', (e) => {
+        const t = e.target.closest('.tab');
+        if (!t) return;
+        document.querySelectorAll('.tab').forEach((x) => x.classList.remove('on'));
+        t.classList.add('on');
+        tab = t.textContent.trim().toLowerCase();
+        paint();
+    });
+
+    $('q').addEventListener('input', paint);
+    $('sort').addEventListener('change', sort);
+    body.addEventListener('change', (e) => {
+        if (e.target.matches('input[type="checkbox"]')) paint();
+    });
+    all.addEventListener('change', () => {
+        shown().forEach((r) => { r.querySelector('input').checked = all.checked; });
+        paint();
+    });
+    $('bulkX').addEventListener('click', () => {
+        rows.forEach((r) => { r.querySelector('input').checked = false; });
+        paint();
+    });
+    $('clearF').addEventListener('click', () => {
+        $('q').value = '';
+        document.querySelectorAll('.tab').forEach((x, i) => x.classList.toggle('on', i === 0));
+        tab = 'all';
+        paint();
+    });
+
+    document.querySelectorAll('[data-bulk]').forEach((b) => b.addEventListener('click', () => {
+        const what = b.dataset.bulk;
+        picked().forEach((r) => {
+            if (what === 'del') { r.remove(); rows.splice(rows.indexOf(r), 1); return; }
+            r.dataset.status = what === 'on' ? 'active' : 'inactive';
+            r.querySelector('.knob').classList.toggle('off', what === 'off');
+            r.querySelector('input').checked = false;
+        });
+        paint();
+    }));
+
+    /* A lock switched off on its own row is inactive too. */
+    document.querySelectorAll('.knob').forEach((k) => k.addEventListener('click', () => {
+        const r = k.closest('tr');
+        if (r) r.dataset.status = k.classList.contains('off') ? 'inactive' : 'active';
+        paint();
+    }));
+
+    sort();
+    paint();
+</script>
+</html>

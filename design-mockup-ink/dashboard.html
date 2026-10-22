@@ -1,0 +1,934 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard &mdash; Airo Access Lock</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+    /* The home screen. It answers one question before any other — are the
+       locks doing anything? — so it opens with the figures, then with the
+       fourteen days behind them and the locks that earned them.
+
+       Everything under that is a way out of this page: the parts of the app,
+       what the plan allows, and two ways to reach a person. No work happens
+       here; the lock list lives at locks.html. */
+
+    /* ------------------------------------------------------------ hello -- */
+    .hi { margin-bottom: 14px; }
+    .hi-t { font-size: 22px; font-weight: 650; letter-spacing: -.015em;
+            display: flex; align-items: center; gap: 8px; }
+    .wave { display: inline-block; transform-origin: 70% 75%; animation: wave 2.6s ease-in-out infinite; }
+    @keyframes wave {
+        0%, 62%, 100% { transform: none; }
+        68% { transform: rotate(16deg); }
+        74% { transform: rotate(-10deg); }
+        80% { transform: rotate(13deg); }
+        86% { transform: rotate(-6deg); }
+    }
+
+    /* ----------------------------------------------------------- figures -- */
+    /* One summary of one store, so one card — the same divided card the lock
+       list and the widget list use. Every cell is a link, because a number on
+       a home screen is a question about somewhere else. */
+    .stat-row {
+        display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: 14px;
+        background: #fff; border: 1px solid var(--p-border-soft); border-radius: 12px;
+        box-shadow: var(--p-card-shadow); overflow: hidden;
+    }
+    .stat-row .stat {
+        border: 0; border-radius: 0; box-shadow: none; background: transparent;
+        padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+        color: inherit; text-decoration: none; transition: background .12s;
+    }
+    .stat-row .stat + .stat { border-left: 1px solid var(--p-border-soft); }
+    .stat-row .stat:hover { background: #fafbfc; border-color: transparent; box-shadow: none; }
+    .stat-row .stat:hover .stat-v { color: var(--accent-strong); }
+    .stat-v { transition: color .12s; }
+    .stat-ico {
+        width: 32px; height: 32px; border-radius: 9px; background: #f1f1f1;
+        border: 0; display: grid; place-items: center; flex: none; color: var(--ink-1);
+    }
+    .stat-ico svg { width: 17px; height: 17px; }
+    .stat-ico.good { background: var(--p-success-bg); color: var(--p-success-fg); }
+    .stat-ico.warn { background: var(--p-warning-bg); color: var(--p-warning-fg); }
+    .stat-ico.info { background: var(--p-info-bg); color: var(--p-info-fg); }
+    .stat-ico.brand { background: var(--v-100); color: var(--v-800); }
+    .stat-v { font-size: 21px; font-weight: 700; line-height: 25px; display: block;
+              letter-spacing: -.015em; }
+    .stat-l { display: block; font-size: 12.5px; font-weight: 550; }
+    .stat-note { display: block; font-size: 11.5px; color: var(--p-text-sub); margin-top: 2px; }
+
+    /* ------------------------------------------------------- the layout -- */
+    .home { display: grid; grid-template-columns: minmax(0, 1fr) 316px; gap: 14px; align-items: start; }
+    .home-main, .home-rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+    .sec-head { display: flex; align-items: flex-start; gap: 12px; }
+    .sec-t { font-size: 14px; font-weight: 650; }
+    .sec-d { font-size: 12.5px; color: var(--p-text-sub); margin-top: 3px; }
+
+    /* ------------------------------------------------------- the chart -- */
+    /* Fourteen days of one question: how many people a lock stopped, and how
+       many of them got through it. One bar per day, filled from the bottom,
+       so the pair is a proportion rather than two numbers to compare. */
+    /* A measured ground: the peak is named, so the chart does not need a
+       hover to say how big its biggest day was. */
+    .ch-wrap { position: relative; margin-top: 18px; }
+    /* A scale to read the bars against: three lines, the top one the busiest
+       day. The bars sit over them. */
+    .ch-grid { position: absolute; inset: 0 0 auto 0; height: 150px; display: flex;
+               flex-direction: column; justify-content: space-between; pointer-events: none; }
+    .ch-g { display: flex; align-items: center; gap: 9px; font-size: 10.5px;
+            color: var(--p-text-disabled); }
+    .ch-g > b { width: 27px; text-align: right; font-weight: 500; flex: none; }
+    .ch-g::after { content: ''; flex: 1; height: 1px; background: var(--p-border-soft); }
+    .ch-g.base::after { background: var(--p-border); }
+    .chart { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+             gap: 10px; align-items: end; height: 150px; margin-left: 36px;
+             position: relative; }
+    .ch-col { height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+    /* No entry animation on the bars: their height is the data, and a tab
+       that loads in the background has its timeline paused, which would leave
+       the chart empty until it was looked at. */
+    /* A bar is a bar, not a block: capped and centred, so the column is
+       mostly the space around it. */
+    .ch-bar {
+        width: 100%; max-width: 26px; background: #eeeef1; border-radius: 4px 4px 0 0;
+        position: relative; transition: background .12s;
+    }
+    .ch-col:hover .ch-bar { background: #e2e2e7; }
+    .ch-bar > i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent);
+                  border-radius: 4px 4px 0 0; transition: background .12s; }
+    .ch-col:hover .ch-bar > i { background: var(--accent-strong); }
+    /* The busiest day, which the top gridline is measuring. */
+    .ch-col.peak .ch-bar > i { background: var(--accent-deep); }
+
+    /* Every day says which day it is. */
+    .ch-days { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+               gap: 10px; margin: 8px 0 0 36px; }
+    .ch-days span { font-size: 10.5px; color: var(--p-text-sub); text-align: center;
+                    white-space: nowrap; }
+    .ch-days span.peak, .ch-days span.today { color: var(--p-text); font-weight: 650; }
+
+    /* The browser's own title tooltip takes a second to appear and looks like
+       a file manager; this one belongs to the chart. */
+    .ch-tip {
+        position: absolute; transform: translate(-50%, -100%); margin-top: -9px;
+        background: #1a1a1a; color: #fff; font-size: 11px; line-height: 1.45;
+        padding: 6px 9px; border-radius: 8px; white-space: nowrap; pointer-events: none;
+        opacity: 0; transition: opacity .1s; z-index: 3;
+    }
+    .ch-tip b { font-weight: 650; }
+    .ch-tip.on { opacity: 1; }
+
+    .key { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .key span { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--p-text-sub); }
+    .key i { width: 9px; height: 9px; border-radius: 3px; display: block; }
+
+    /* The answer to "are my locks working", above the four rows that explain
+       it. Tinted by that answer, because the two cases are not the same news. */
+    .run {
+        display: flex; align-items: center; gap: 11px; margin-top: 12px;
+        padding: 10px 12px; border-radius: 10px;
+        background: var(--p-success-bg); border: 1px solid rgba(0, 0, 0, .06);
+    }
+    .run-ic { width: 9px; height: 9px; border-radius: 50%; flex: none;
+              background: var(--p-success-fg); }
+    .run-t { display: block; font-size: 13px; font-weight: 650; }
+    .run-d { display: block; font-size: 12px; color: var(--p-text-sub); margin-top: 1px; }
+    .run.off { background: var(--p-critical-bg); }
+    .run.off .run-ic { background: var(--p-critical-fg); }
+    .run.off .run-t { color: var(--p-critical-fg); }
+
+    /* --------------------------------------------------- the extensions -- */
+    .ext { display: flex; align-items: center; gap: 13px; padding: 13px 16px;
+           border-bottom: 1px solid var(--p-border-soft); transition: background .12s; }
+    .ext:last-child { border-bottom: 0; }
+    .ext:hover { background: #fafafa; }
+    /* The one that is off carries a mark down its edge, so the card says which
+       row to read before any of the words are read. */
+    .ext.off { box-shadow: inset 3px 0 0 var(--p-warning-fg); }
+    .ext-ico {
+        width: 34px; height: 34px; border-radius: 9px; flex: none; display: grid;
+        place-items: center; background: #f1f1f1; color: var(--ink-1);
+    }
+    .ext-n { font-size: 13px; font-weight: 600; display: flex; align-items: center;
+             gap: 7px; flex-wrap: wrap; }
+    .ext-d { font-size: 12.5px; color: var(--p-text-sub); margin-top: 2px; }
+    .ext-h { font-size: 12px; color: var(--p-text-sub); margin-top: 3px; display: none; }
+
+    /* The re-check: every row reports again, one after another. */
+    .ext.checking .badge, .ext.checking .btn { visibility: hidden; }
+    .ext.checking .ext-h { display: block; }
+    .ext-spin {
+        width: 15px; height: 15px; border-radius: 50%; flex: none;
+        border: 2px solid var(--p-border); border-top-color: var(--accent);
+        animation: spin .7s linear infinite; display: none;
+    }
+    .ext.checking .ext-spin { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ------------------------------------------------- done-for-you set -- */
+    /* A row, not a column: at full width a stacked block leaves the middle
+       of the card empty. The art reads as the mark, the sentence runs across,
+       and the button sits where every other primary action on this page is. */
+    .dfy {
+        display: flex; align-items: center; gap: 20px; padding: 15px 18px; margin-bottom: 14px;
+        border-radius: 12px; border: 1px solid var(--p-border-soft); background: #fff;
+        box-shadow: var(--p-card-shadow);
+    }
+    .dfy-t { font-size: 14px; font-weight: 650; }
+    .dfy-d { font-size: 12.5px; color: var(--p-text-sub); margin: 3px 0 0; max-width: 92ch; }
+    .dfy-free { font-weight: 600; color: var(--p-text); }
+    .dfy-go { flex: none; position: relative; z-index: 1; }
+
+    /* A small scene: two gears turning, a lock settling into place between
+       them. Inline SVG so it takes the accent and costs nothing to load. */
+    .dfy-art { width: 96px; height: 73px; flex: none; order: -1; color: var(--accent); }
+    .gearA { transform-origin: 34px 40px; animation: turn 7s linear infinite; }
+    .gearB { transform-origin: 112px 72px; animation: turn 7s linear infinite reverse; }
+    @keyframes turn { to { transform: rotate(360deg); } }
+    .dfy-lock { transform-origin: 73px 58px; animation: settle 3.4s ease-in-out infinite; }
+    @keyframes settle {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+    }
+    .spark { animation: spark 3.4s ease-in-out infinite; }
+    .spark:nth-of-type(2) { animation-delay: .5s; }
+    @keyframes spark {
+        0%, 55%, 100% { opacity: 0; transform: scale(.5); }
+        70% { opacity: 1; transform: scale(1); }
+    }
+
+    /* ------------------------------------------------------------ rail -- */
+    .plan-badge {
+        font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+        padding: 4px 10px; border-radius: 7px; background: var(--accent); color: #fff;
+    }
+    .bar { height: 6px; border-radius: 20px; background: #e3e3e3; overflow: hidden; }
+    .bar > i { display: block; height: 100%; border-radius: 20px; background: var(--accent);
+               transition: width .5s ease; }
+
+    /* What's new, the other half of a home screen's job. */
+    .news { list-style: none; margin: 12px 0 0; padding: 0; }
+    .news li { padding: 11px 0; border-top: 1px solid var(--p-border-soft); }
+    .news li:first-child { border-top: 0; padding-top: 2px; }
+    .news-d { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+              color: var(--p-text-sub); }
+    .news-t { display: block; font-size: 13px; font-weight: 600; margin-top: 3px; }
+    .news-x { font-size: 12.5px; color: var(--p-text-sub); margin-top: 3px; }
+
+    /* ------------------------------------------------- the other apps -- */
+    /* A shelf: as many as the column fits, the rest one swipe away. */
+    .promo-track {
+        display: flex; gap: 12px; margin-top: 13px; padding: 2px 2px 4px;
+        overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth;
+        scrollbar-width: none;
+    }
+    .promo-track::-webkit-scrollbar { display: none; }
+    .promo-track:focus-visible { outline: 2px solid var(--accent-ring); border-radius: 12px; }
+    /* Three to a page, whatever the page is worth. */
+    .promo-c {
+        flex: 0 0 clamp(210px, calc((100% - 24px) / 3), 340px); scroll-snap-align: start;
+        display: flex; flex-direction: column; gap: 10px; padding: 14px;
+        border: 1px solid var(--p-border-soft); border-radius: 11px; background: #fff;
+        transition: border-color .12s, box-shadow .12s;
+    }
+    .promo-c:hover { border-color: #b5b5b5; box-shadow: var(--p-card-shadow); }
+    .promo-h { display: flex; align-items: center; gap: 10px; }
+    .promo-n { font-size: 12.5px; font-weight: 650; line-height: 1.3; }
+    .promo-t { font-size: 11.5px; color: var(--p-text-sub); line-height: 1.45; margin: 0; flex: 1; }
+    .promo-c .btn { align-self: flex-start; }
+
+    /* The logo loads from the App Store; the monogram is what is left if it
+       does not, which is also what the app's own dock falls back to. */
+    .app-ic {
+        width: 34px; height: 34px; border-radius: 9px; flex: none; overflow: hidden;
+        background: var(--v-900); color: #fff; display: grid; place-items: center;
+        font-size: 14px; font-weight: 700;
+    }
+    .app-ic::before { content: attr(data-m); grid-area: 1 / 1; }
+    .app-ic img { grid-area: 1 / 1; width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .help-l { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+    .help-l a {
+        display: flex; align-items: center; gap: 9px; padding: 7px 8px; margin: 0 -8px;
+        border-radius: 8px; font-size: 13px; color: var(--p-text); text-decoration: none;
+    }
+    .help-l a:hover { background: #f1f1f1; }
+    .help-l svg { color: var(--p-text-sub); flex: none; }
+
+    /* --------------------------------------------------------- the chat -- */
+    /* The app already runs Crisp; this is what "Contact us" opens. */
+    .chat-fab {
+        position: fixed; right: 22px; bottom: 22px; z-index: 55;
+        width: 52px; height: 52px; border-radius: 50%; border: 0; cursor: pointer;
+        background: var(--accent); color: #fff; display: grid; place-items: center;
+        box-shadow: 0 10px 28px -8px rgba(26, 26, 26, .55);
+    }
+    .chat-fab:hover { background: var(--accent-strong); }
+    .chat-dot {
+        position: absolute; top: 2px; right: 2px; width: 11px; height: 11px; border-radius: 50%;
+        background: var(--p-success-fg); border: 2px solid var(--accent);
+    }
+    .chat-box {
+        position: fixed; right: 22px; bottom: 84px; z-index: 56; width: 304px;
+        background: #fff; border-radius: 14px; border: 1px solid var(--p-border);
+        box-shadow: 0 26px 70px -18px rgba(0, 0, 0, .4); overflow: hidden;
+        transform: translateY(10px) scale(.97); opacity: 0; pointer-events: none;
+        transition: opacity .18s, transform .18s;
+    }
+    .chat-box.on { transform: none; opacity: 1; pointer-events: auto; }
+    .chat-head { background: var(--accent); color: #fff; padding: 13px 15px; }
+    .chat-head .sm { color: rgba(255, 255, 255, .72); }
+    .chat-body { padding: 14px 15px; display: flex; flex-direction: column; gap: 9px; }
+    .msg { font-size: 13px; line-height: 1.45; padding: 9px 12px; border-radius: 12px;
+           background: #f1f1f1; border-bottom-left-radius: 4px; max-width: 88%; }
+    .chat-foot { padding: 10px 12px; border-top: 1px solid var(--p-border-soft);
+                 display: flex; gap: 8px; }
+
+    /* --------------------------------------------------------- narrower -- */
+    /* The Shopify frame is about 326px narrower than the window, so what the
+       four cells actually share is the window less that. Below 1240 there is
+       no room for a sentence under each number; below 1000 the labels start
+       wrapping, so there is no room for four cells at all. */
+    @media (max-width: 1240px) { .stat-note { display: none; } }
+    @media (max-width: 1040px) {
+        .home { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 1000px) {
+        .stat-row { grid-template-columns: repeat(2, 1fr); }
+        .stat-row .stat:nth-child(3) { border-left: 0; }
+        .stat-row .stat:nth-child(n+3) { border-top: 1px solid var(--p-border-soft); }
+    }
+    @media (max-width: 720px) {
+        .stat-row .stat { padding: 12px 13px; gap: 11px; }
+        /* A card's action takes its own row rather than squeezing the
+           heading it sits beside into a column five words wide. */
+        .sec-head { flex-wrap: wrap; }
+        .sec-head > .btn { order: 3; width: 100%; }
+        /* The badge and the way in take their own line, rather than squeezing
+           the sentence between them into a column ten words tall. */
+        .ext { flex-wrap: wrap; row-gap: 10px; }
+        .ext .grow { flex: 1 0 calc(100% - 47px); }
+        .ext .btn { margin-left: auto; }
+        .dfy { flex-wrap: wrap; gap: 12px; }
+        .dfy .grow { flex-basis: 100%; order: 1; }
+        .dfy-go { width: 100%; order: 2; }
+        .chat-box { right: 12px; left: 12px; width: auto; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .wave, .gearA, .gearB, .dfy-lock, .spark, .ext-spin, .ch-bar { animation: none !important; }
+    }
+</style>
+
+<main class="page full">
+
+    <!-- Who you are and what this is, the way every Avada app opens. -->
+    <div class="hi between wrap g12">
+        <div>
+            <h1 class="hi-t">Hi Aoun <span class="wave" aria-hidden="true">&#128075;</span></h1>
+            <p class="sm sub mt4">Here is what your locks did over the last 30 days.</p>
+        </div>
+    </div>
+
+    <!-- The figures, and where each of them is answered. -->
+    <div class="stat-row">
+        <a class="stat" href="locks.html">
+            <span class="stat-ico info" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="11" width="16" height="10" rx="2.5"></rect>
+                    <path d="M8 11V7.5a4 4 0 0 1 8 0V11"></path></svg></span>
+            <span>
+                <span class="stat-v">1,752</span>
+                <span class="stat-l">Visitors stopped</span>
+                <span class="stat-note">Reached something locked</span>
+            </span>
+        </a>
+        <a class="stat" href="locks.html">
+            <span class="stat-ico good" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="11" width="16" height="10" rx="2.5"></rect>
+                    <path d="M8 11V7.5a4 4 0 0 1 7.5-2"></path></svg></span>
+            <span>
+                <span class="stat-v">653</span>
+                <span class="stat-l">Got through</span>
+                <span class="stat-note">37% of everyone stopped</span>
+            </span>
+        </a>
+        <a class="stat" href="#">
+            <span class="stat-ico warn" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 5h16v11H8l-4 4z"></path><path d="M12 8v3M12 13.5v.01"></path></svg></span>
+            <span>
+                <span class="stat-v">12</span>
+                <span class="stat-l">Access requests</span>
+                <span class="stat-note">Waiting for your answer</span>
+            </span>
+        </a>
+        <a class="stat" href="locks.html">
+            <span class="stat-ico brand" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z"></path>
+                    <path d="M3.5 7.5L12 12l8.5-4.5M12 12v9"></path></svg></span>
+            <span>
+                <span class="stat-v">64</span>
+                <span class="stat-l">Items secured</span>
+                <span class="stat-note">Products, pages, collections</span>
+            </span>
+        </a>
+    </div>
+
+    <!-- Set it up for you. Directly under the figures, where the offer of a
+         person used to be: it is the same offer, asking for less. -->
+    <div class="dfy">
+        <div class="grow">
+            <span class="dfy-t">Would you rather we set it up for you?</span>
+            <p class="dfy-d">Tell us who should get through and what they should see. We build
+                the locks on your store, test them against your theme, and hand them back
+                ready to switch on. <strong class="dfy-free">Free on the Pro plan.</strong></p>
+        </div>
+
+        <button class="btn primary dfy-go" data-open="dfyModal">Request setup for me</button>
+
+        <svg class="dfy-art" viewBox="0 0 148 112" fill="none" stroke="currentColor"
+             stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true">
+            <g class="gearA" opacity=".34">
+                <circle cx="34" cy="40" r="13"></circle>
+                <path d="M34 22v5M34 53v5M16 40h5M47 40h5M22 28l3.5 3.5M42.5 48.5L46 52M46 28l-3.5 3.5M25.5 48.5L22 52"></path>
+            </g>
+            <g class="gearB" opacity=".34">
+                <circle cx="112" cy="72" r="10"></circle>
+                <path d="M112 58v4M112 82v4M98 72h4M122 72h4M102 62l3 3M119 79l3 3M122 62l-3 3M105 79l-3 3"></path>
+            </g>
+            <g class="dfy-lock">
+                <rect x="55" y="52" width="36" height="27" rx="7" fill="var(--p-surface)"></rect>
+                <path d="M63 52v-8a10 10 0 0 1 20 0v8"></path>
+                <path d="M73 63v6"></path>
+            </g>
+            <path class="spark" d="M104 28v8M100 32h8" stroke-width="2.6" opacity="0"></path>
+            <path class="spark" d="M30 82v6M27 85h6" stroke-width="2.6" opacity="0"></path>
+        </svg>
+    </div>
+
+    <div class="home">
+        <div class="home-main">
+
+            <!-- First on the page: with the theme app embed off, every lock on
+                 the store is inert and everything below this is history. The
+                 headline is read from the embed row's own badge so the two
+                 cannot disagree. -->
+            <section class="card">
+                <div class="card-sec">
+                    <div class="sec-head">
+                        <div class="grow">
+                            <span class="sec-t">App extensions
+                                <span class="badge warning hide" id="extOff"></span></span>
+                            <p class="sec-d">What Airo has installed in your theme, your checkout
+                                and Shopify Flow.</p>
+                        </div>
+                        <button class="btn" id="recheck">Re-check all</button>
+                    </div>
+                    <div class="run" id="run">
+                        <span class="run-ic" aria-hidden="true"></span>
+                        <span class="grow">
+                            <span class="run-t" id="runT"></span>
+                            <span class="run-d" id="runD"></span>
+                        </span>
+                        <a class="btn hide" id="runGo" href="#">Turn it on</a>
+                    </div>
+                    <p class="xs sub" id="checkedAt" style="margin-top:10px">Checked 4 minutes ago
+                        &middot; re-checked automatically every 10 minutes.</p>
+                </div>
+
+                <div class="ext">
+                    <span class="ext-ico" aria-hidden="true">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 9l1.5-5h15L21 9M3 9h18M3 9v11h18V9"></path>
+                            <path d="M9 20v-6h6v6"></path></svg></span>
+                    <div class="grow">
+                        <span class="ext-n">Theme app embed
+                            <span class="xs sub" style="font-weight:450">Access Control</span></span>
+                        <p class="ext-d">Loads your locks on every storefront page.</p>
+                        <p class="ext-h">Reading the live theme&rsquo;s settings&hellip;</p>
+                    </div>
+                    <span class="ext-spin" aria-hidden="true"></span>
+                    <span class="badge success">On</span>
+                    <a class="btn" href="#">App embed settings</a>
+                </div>
+
+                <div class="ext off">
+                    <span class="ext-ico" aria-hidden="true">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 5h2l2.2 10.4a2 2 0 0 0 2 1.6h7.5a2 2 0 0 0 2-1.5L20 8H6"></path>
+                            <circle cx="10" cy="20" r="1.2"></circle>
+                            <circle cx="17" cy="20" r="1.2"></circle></svg></span>
+                    <div class="grow">
+                        <span class="ext-n">Checkout block</span>
+                        <p class="ext-d">Shows the lock&rsquo;s message in checkout when a cart
+                            holds something the shopper cannot buy.</p>
+                        <p class="ext-h">Reading your checkout profile&hellip;</p>
+                    </div>
+                    <span class="ext-spin" aria-hidden="true"></span>
+                    <span class="badge">Off</span>
+                    <a class="btn primary" href="#">Checkout editor</a>
+                </div>
+
+                <div class="ext">
+                    <span class="ext-ico" aria-hidden="true">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3l8 3v6c0 5-3.4 8.3-8 9-4.6-.7-8-4-8-9V6z"></path>
+                            <path d="M9 12l2 2 4-4"></path></svg></span>
+                    <div class="grow">
+                        <span class="ext-n">Checkout validation</span>
+                        <p class="ext-d">Hard enforcement &mdash; the order cannot be placed at
+                            all. Shopify only allows this on Plus.</p>
+                        <p class="ext-h">Checking your plan with Shopify&hellip;</p>
+                    </div>
+                    <span class="ext-spin" aria-hidden="true"></span>
+                    <span class="badge">Plus only</span>
+                    <a class="btn" href="#">Learn more</a>
+                </div>
+
+                <div class="ext">
+                    <span class="ext-ico" aria-hidden="true">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="6" cy="6" r="2.5"></circle><circle cx="18" cy="18" r="2.5"></circle>
+                            <path d="M8.5 6H14a4 4 0 0 1 0 8H9.5"></path></svg></span>
+                    <div class="grow">
+                        <span class="ext-n">Shopify Flow</span>
+                        <p class="ext-d">5 triggers and 3 actions &mdash; grant access, revoke it,
+                            tag a customer, or react to a request.</p>
+                        <p class="ext-h">Asking Flow which of ours it can see&hellip;</p>
+                    </div>
+                    <span class="ext-spin" aria-hidden="true"></span>
+                    <span class="badge success">Ready</span>
+                    <a class="btn" href="#">Open Flow</a>
+                </div>
+            </section>
+
+            <!-- The fourteen days behind the figures. Which locks earned them
+                 is the locks list's job, one click away in the sidebar. -->
+            <section class="card">
+                <div class="card-sec">
+                    <div class="sec-head">
+                        <div class="grow">
+                            <span class="sec-t">Access over the last 14 days</span>
+                            <p class="sec-d">Every visitor a lock stopped, and how many of them
+                                got through it.</p>
+                        </div>
+                        <span class="key" aria-hidden="true">
+                            <span><i style="background:var(--accent)"></i>Got through</span>
+                            <span><i style="background:#ececec"></i>Stopped</span>
+                        </span>
+                    </div>
+
+                    <div class="ch-wrap">
+                        <div class="ch-grid" id="chGrid" aria-hidden="true"></div>
+                        <div class="chart" id="chart"></div>
+                        <div class="ch-days" id="chDays" aria-hidden="true"></div>
+                        <div class="ch-tip" id="chTip"></div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- The rest of what this team makes. The same list the app's own
+                 partner dock carries, with this app left out of it. A row
+                 rather than a column: five items down a page are a list to
+                 read, five across are a shelf to glance at. -->
+            <section class="card card-p">
+                <span class="sec-t">Recommended apps</span>
+                <p class="sec-d">The same team builds these. They run on this store the way
+                    your locks do.</p>
+                <div class="promo-track" id="promoTrack" tabindex="0"
+                     aria-label="Other apps from this team">
+                        <div class="promo-c">
+                            <div class="promo-h">
+                                <span class="app-ic" data-m="B">
+                                    <img src="https://cdn.shopify.com/s/files/1/0718/7723/0786/files/SKU.png?v=1772877734" alt="" width="34" height="34" loading="lazy"
+                                         onerror="this.remove()">
+                                </span>
+                                <span class="promo-n">Airo Retail Barcode Generator</span>
+                            </div>
+                            <p class="promo-t">Print retail labels and generate UPC, GTIN and EAN codes for your products.</p>
+                            <a class="btn" href="https://apps.shopify.com/airo-sku-barcode-generator" target="_blank" rel="noopener">Generate barcodes</a>
+                        </div>
+                        <div class="promo-c">
+                            <div class="promo-h">
+                                <span class="app-ic" data-m="W">
+                                    <img src="https://cdn.shopify.com/s/files/1/0786/1197/2334/files/Automation.png?v=1772704626" alt="" width="34" height="34" loading="lazy"
+                                         onerror="this.remove()">
+                                </span>
+                                <span class="promo-n">Ai Workflow Automation &amp; Flow</span>
+                            </div>
+                            <p class="promo-t">Automate the jobs around your locks &mdash; tagging, access, and what happens next.</p>
+                            <a class="btn" href="https://apps.shopify.com/airoflows" target="_blank" rel="noopener">Build a workflow</a>
+                        </div>
+                        <div class="promo-c">
+                            <div class="promo-h">
+                                <span class="app-ic" data-m="E">
+                                    <img src="https://cdn.shopify.com/app-store/listing_images/a11463ebdf910068e50a071f6bb5affa/icon/CObLs6_Ro5IDEAE=.png" alt="" width="34" height="34" loading="lazy"
+                                         onerror="this.remove()">
+                                </span>
+                                <span class="promo-n">Airo Bulk Product Editor</span>
+                            </div>
+                            <p class="promo-t">Change prices, titles, metafields and tags across many products at once.</p>
+                            <a class="btn" href="https://apps.shopify.com/airo-bulk-editor" target="_blank" rel="noopener">Bulk edit products</a>
+                        </div>
+                        <div class="promo-c">
+                            <div class="promo-h">
+                                <span class="app-ic" data-m="P">
+                                    <img src="https://cdn.shopify.com/s/files/1/0805/0507/8001/files/Resturant_POS.png?v=1782885897" alt="" width="34" height="34" loading="lazy"
+                                         onerror="this.remove()">
+                                </span>
+                                <span class="promo-n">Restaurant | Cafe: Coffee Shop</span>
+                            </div>
+                            <p class="promo-t">Run a restaurant or cafe counter with a kitchen display, modifiers and tickets.</p>
+                            <a class="btn" href="https://apps.shopify.com/airo-resturant-pos" target="_blank" rel="noopener">Set up a POS</a>
+                        </div>
+                        <div class="promo-c">
+                            <div class="promo-h">
+                                <span class="app-ic" data-m="Y">
+                                    <img src="https://cdn.shopify.com/app-store/listing_images/4f4b7df715421f63e90c7d56f648f572/icon/CP3Ev-Og9ZUDEAE=.png" alt="" width="34" height="34" loading="lazy"
+                                         onerror="this.remove()">
+                                </span>
+                                <span class="promo-n">Airo YMM Search: Year Make Model</span>
+                            </div>
+                            <p class="promo-t">Let shoppers filter parts down to the year, make and model that fits.</p>
+                            <a class="btn" href="https://apps.shopify.com/airo-ymm-search" target="_blank" rel="noopener">Add fitment search</a>
+                        </div>
+                </div>
+                <div class="dots" id="promoDots" role="tablist" aria-label="More apps"></div>
+            </section>
+        </div>
+
+        <!-- ----------------------------------------------------------- rail -->
+        <aside class="home-rail">
+
+            <section class="card card-p">
+                <div class="between">
+                    <span class="sec-t">Plan &amp; usage</span>
+                    <span class="plan-badge">Pro</span>
+                </div>
+                <p class="sec-d">Renews 14 November 2026</p>
+
+                <div class="between" style="margin:14px 0 6px">
+                    <span class="sm"><strong>3 of 20</strong> locks used</span>
+                    <span class="xs sub">17 left</span>
+                </div>
+                <div class="bar"><i style="width:15%"></i></div>
+
+                <div class="between" style="margin:12px 0 6px">
+                    <span class="sm"><strong>5 of 20</strong> widgets used</span>
+                    <span class="xs sub">15 left</span>
+                </div>
+                <div class="bar"><i style="width:25%"></i></div>
+
+                <a class="btn full mt16" href="plans.html">View plans</a>
+            </section>
+
+            <section class="card card-p">
+                <div class="between">
+                    <span class="sec-t">What&rsquo;s new</span>
+                    <span class="badge">3</span>
+                </div>
+                <ol class="news">
+                    <li>
+                        <span class="news-d">12 Oct</span>
+                        <span class="news-t">Shopify Flow actions</span>
+                        <p class="news-x">Grant access, revoke it or tag a customer from any
+                            Flow automation.</p>
+                    </li>
+                    <li>
+                        <span class="news-d">28 Sept</span>
+                        <span class="news-t">Checkout validation on Plus</span>
+                        <p class="news-x">A locked item can no longer be bought from a cart that
+                            was filled before the lock went on.</p>
+                    </li>
+                    <li>
+                        <span class="news-d">9 Sept</span>
+                        <span class="news-t">Request Credentials</span>
+                        <p class="news-x">Shoppers can ask for access from the locked page, and
+                            you approve or decline in the app.</p>
+                    </li>
+                </ol>
+                <a class="btn full mt16" href="#">See all updates</a>
+            </section>
+
+            <section class="card card-p">
+                <span class="sec-t">Help &amp; support</span>
+                <p class="sec-d">A real person answers in the app, usually within a few
+                    minutes.</p>
+
+                <button class="btn primary full mt16" id="contactUs">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                        <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.6-4.8A8.4 8.4 0 0 1 3.6 11 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"></path>
+                    </svg>
+                    Contact us
+                </button>
+
+                <div class="help-l">
+                    <a href="#">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22z"></path>
+                            <path d="M8 7h8M8 11h6"></path></svg>
+                        Help docs
+                    </a>
+                    <a href="#">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3l2.6 5.6 6.1.8-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.4l6.1-.8z"></path></svg>
+                        Request a feature
+                    </a>
+                </div>
+            </section>
+        </aside>
+    </div>
+
+</main>
+
+<!-- ------------------------------------------------------------- the chat -->
+<button class="chat-fab" id="chatFab" aria-label="Contact us">
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.6-4.8A8.4 8.4 0 0 1 3.6 11 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"></path>
+    </svg>
+    <span class="chat-dot" aria-hidden="true"></span>
+</button>
+
+<div class="chat-box" id="chatBox" role="dialog" aria-label="Chat with Airo support">
+    <div class="chat-head between">
+        <div>
+            <span class="strong">Airo support</span>
+            <p class="sm">Typically replies in a few minutes</p>
+        </div>
+        <button class="btn icon" id="chatX" aria-label="Close chat"
+                style="background:transparent;border-color:rgba(255,255,255,.3);color:#fff;box-shadow:none">&times;</button>
+    </div>
+    <div class="chat-body">
+        <p class="msg">Hi Aoun &mdash; what are you trying to lock? Paste a link and I&rsquo;ll
+            tell you which rule fits.</p>
+        <span class="xs sub">Airo &middot; just now</span>
+    </div>
+    <div class="chat-foot">
+        <input class="input grow" placeholder="Write a message&hellip;" aria-label="Message">
+        <button class="btn primary">Send</button>
+    </div>
+</div>
+
+<!-- --------------------------------------------------------- setup for you -->
+<div class="modal-bg hide" id="dfyModal">
+    <div class="modal" style="max-width:480px">
+        <div class="modal-head">
+            <span class="h-md">Request setup for me</span>
+            <button class="btn icon" data-close aria-label="Close">&times;</button>
+        </div>
+        <div class="card-p stack g12">
+            <p class="sm sub">Describe the result you want in your own words. We build it on your
+                store, test it against your live theme, and leave it switched off until you have
+                looked at it.</p>
+            <label class="field">
+                <span class="label">Who should get through?</span>
+                <textarea class="textarea" rows="3"
+                          placeholder="Customers tagged wholesale, plus anyone with the passcode TRADE26&hellip;"></textarea>
+            </label>
+            <label class="field">
+                <span class="label">What should everyone else see?</span>
+                <textarea class="textarea" rows="2"
+                          placeholder="Hide the price and show a 'Request trade access' form."></textarea>
+            </label>
+            <p class="xs sub">Usually back within one working day. Free on the Pro plan.</p>
+        </div>
+        <div class="modal-foot">
+            <button class="btn" data-close>Cancel</button>
+            <button class="btn primary" data-close>Send request</button>
+        </div>
+    </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+    mountChrome('home');
+
+    /* ------------------------------------------------------------ chart -- */
+    /* Fourteen days: [label, stopped, got through]. They add up to the two
+       headline figures, which are themselves the sum of the lock list. */
+    const DAYS = [
+        ['7 Oct', 48, 16], ['8 Oct', 55, 19], ['9 Oct', 61, 24], ['10 Oct', 52, 18],
+        ['11 Oct', 38, 13], ['12 Oct', 41, 15], ['13 Oct', 66, 25], ['14 Oct', 72, 28],
+        ['15 Oct', 69, 26], ['16 Oct', 58, 21], ['17 Oct', 63, 24], ['18 Oct', 44, 16],
+        ['19 Oct', 47, 17], ['20 Oct', 74, 30],
+    ];
+    const peak = Math.max(...DAYS.map((d) => d[1]));
+    const peakAt = DAYS.findIndex((d) => d[1] === peak);
+
+    /* The scale: the busiest day, half of it, and nothing. */
+    document.getElementById('chGrid').innerHTML =
+        [peak, Math.round(peak / 2), 0]
+            .map((v, i) => `<span class="ch-g${i === 2 ? ' base' : ''}"><b>${v}</b></span>`)
+            .join('');
+
+    document.getElementById('chart').innerHTML = DAYS.map(([, stopped, through], i) => `
+        <div class="ch-col${i === peakAt ? ' peak' : ''}" data-i="${i}">
+            <span class="ch-bar" style="height:${Math.round(stopped / peak * 100)}%">
+                <i style="height:${Math.round(through / stopped * 100)}%"></i>
+            </span>
+        </div>`).join('');
+
+    /* A day number under each bar, the month on the first, and the last one
+       named rather than numbered. */
+    document.getElementById('chDays').innerHTML = DAYS.map(([day], i) => {
+        const last = i === DAYS.length - 1;
+        const cls = i === peakAt ? ' class="peak"' : (last ? ' class="today"' : '');
+        const text = last ? 'Today' : (i === 0 ? day : day.split(' ')[0]);
+        return `<span${cls}>${text}</span>`;
+    }).join('');
+
+    /* The tooltip follows the column under the pointer, and sits on top of
+       that column's bar rather than at a fixed height. */
+    {
+        const chart = document.getElementById('chart');
+        const tip = document.getElementById('chTip');
+        const wrap = chart.parentElement;
+        chart.addEventListener('mousemove', (e) => {
+            const col = e.target.closest('.ch-col');
+            if (!col) { tip.classList.remove('on'); return; }
+            const [day, stopped, through] = DAYS[+col.dataset.i];
+            tip.innerHTML = `<b>${day}</b> &middot; ${stopped} stopped<br>${through} got through`;
+            const bar = col.querySelector('.ch-bar').getBoundingClientRect();
+            const w = wrap.getBoundingClientRect();
+            tip.style.left = (bar.left - w.left + bar.width / 2) + 'px';
+            tip.style.top = (bar.top - w.top) + 'px';
+            tip.classList.add('on');
+        });
+        chart.addEventListener('mouseleave', () => tip.classList.remove('on'));
+    }
+
+    /* --------------------------------------------------------- the shelf -- */
+    /* The arrows move it by a card at a time and go dim at the ends; the
+       track itself still scrolls and swipes on its own. */
+    {
+        const track = document.getElementById('promoTrack');
+        const dots = document.getElementById('promoDots');
+
+        /* A page is whatever is in view, so the dots count themselves rather
+           than assuming three. */
+        const pages = () => Math.max(1, Math.ceil((track.scrollWidth - 2) / track.clientWidth));
+        const max = () => track.scrollWidth - track.clientWidth;
+        /* The last page is usually shorter than the others, so the dot is
+           chosen by how far along the scroll is, not by dividing by a width
+           that page does not have. */
+        const here = () => (max() <= 0 ? 0
+            : Math.round(track.scrollLeft / max() * (pages() - 1)));
+
+        function build() {
+            const n = pages();
+            if (dots.children.length !== n) {
+                dots.innerHTML = Array.from({ length: n }, (_, i) =>
+                    '<button class="dot" role="tab" aria-label="Page ' + (i + 1) + '"></button>').join('');
+            }
+            paint();
+        }
+        function paint() {
+            const at = here();
+            [...dots.children].forEach((d, i) => {
+                d.classList.toggle('on', i === at);
+                d.setAttribute('aria-selected', i === at);
+            });
+        }
+        dots.addEventListener('click', (e) => {
+            const i = [...dots.children].indexOf(e.target.closest('.dot'));
+            if (i >= 0) track.scrollTo({ left: Math.min(i * track.clientWidth, max()) });
+        });
+        track.addEventListener('scroll', paint, { passive: true });
+        window.addEventListener('resize', build);
+        build();
+    }
+
+    /* ----------------------------------------------------------- modals -- */
+    document.addEventListener('click', (e) => {
+        const open = e.target.closest('[data-open]');
+        if (open) {
+            e.preventDefault();
+            document.getElementById(open.dataset.open).classList.remove('hide');
+            return;
+        }
+        if (e.target.closest('[data-close]') || e.target.classList.contains('modal-bg')) {
+            e.target.closest('.modal-bg').classList.add('hide');
+        }
+    });
+
+    /* The chat the "Contact us" button opens. */
+    const box = document.getElementById('chatBox');
+    const show = (on) => box.classList.toggle('on', on);
+    document.getElementById('chatFab').addEventListener('click',
+        () => show(!box.classList.contains('on')));
+    document.getElementById('contactUs').addEventListener('click', () => show(true));
+    document.getElementById('chatX').addEventListener('click', () => show(false));
+
+    /* Whether the locks are running at all, and how many extensions are off.
+       Both are read from the rows, so neither can drift from what they say. */
+    const rows = [...document.querySelectorAll('.ext')];
+    const embedRow = rows[0];
+
+    function extState() {
+        const on = !!embedRow.querySelector('.badge.success');
+        const run = document.getElementById('run');
+        run.classList.toggle('off', !on);
+        document.getElementById('runT').textContent = on
+            ? 'Your locks are running on your storefront'
+            : 'Your locks are not running';
+        document.getElementById('runD').textContent = on
+            ? 'The theme app embed is on, so every lock you switch on takes effect.'
+            : 'The theme app embed is off, so nothing below is being enforced.';
+        document.getElementById('runGo').classList.toggle('hide', on);
+
+        const off = rows.filter((r) => r.querySelector('.badge.critical, .badge:not(.success):not(.info)')
+            && /^Off$/.test((r.querySelector('.badge:not(.success)') || {}).textContent || '')).length;
+        const tag = document.getElementById('extOff');
+        tag.textContent = off + ' switched off';
+        tag.classList.toggle('hide', off === 0);
+    }
+    extState();
+
+    /* Re-check: each extension reports again in turn, so the answer looks like
+       four separate questions rather than one spinner over the card. */
+    const btn = document.getElementById('recheck');
+    const quiet = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const DONE = 'Checked just now · again every 10 minutes.';
+
+    btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        if (quiet.matches) {
+            document.getElementById('checkedAt').textContent = DONE;
+            return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Checking…';
+        rows.forEach((r, i) => {
+            setTimeout(() => r.classList.add('checking'), i * 160);
+            setTimeout(() => r.classList.remove('checking'), i * 160 + 900);
+        });
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = 'Re-check all';
+            document.getElementById('checkedAt').textContent = DONE;
+            extState();
+        }, rows.length * 160 + 900);
+    });
+</script>
+</html>

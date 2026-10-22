@@ -1,0 +1,37 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "b1e2b0a22c97cc05cee44f76c16bd9c7"
+name = "Airo Access Lock & Control"
+application_url = "https://lock.airoapps.com/"
+embedded = true
+handle = "acesslock-1"
+
+
+
+[webhooks]
+api_version = "2025-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhook/customers-data-request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhook/customers-redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhook/shop-redact"
+  compliance_topics = [ "shop/redact" ]
+
+[access_scopes]
+scopes = "read_assigned_fulfillment_orders,read_checkouts,read_content,read_draft_orders,read_files,read_fulfillments,read_inventory,read_locales,read_locations,read_markets,read_online_store_navigation,read_online_store_pages,read_orders,read_validations,read_product_listings,read_themes,read_third_party_fulfillment_orders,read_translations,unauthenticated_read_content,unauthenticated_read_product_inventory,unauthenticated_read_product_listings,write_assigned_fulfillment_orders,write_content,write_draft_orders,write_files,write_fulfillments,write_locales,write_markets,write_orders,write_products,write_themes,write_third_party_fulfillment_orders,write_translations,write_inventory,write_validations"
+[auth]
+redirect_urls = [ "https://lock.airoapps.com/authenticate"]
+
+[app_proxy]
+url = "https://lock.airoapps.com/proxy"
+subpath = "airo-lock"
+prefix = "apps"
+
+[pos]
+embedded = false

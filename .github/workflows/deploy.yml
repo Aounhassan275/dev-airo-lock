@@ -1,0 +1,23 @@
+name: Deploy to production
+
+# Auto-deploys lock.airoapps.com by hitting the aaPanel WebHook on every push
+# to main. The webhook (on the VPS) runs the deploy script that pulls + builds.
+# The full webhook URL (incl. access_key) lives in the repo secret below so the
+# key is never committed: Settings -> Secrets and variables -> Actions.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # lets you trigger a deploy manually from the Actions tab
+
+jobs:
+  trigger-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger aaPanel deploy webhook
+        run: |
+          echo "Calling deploy webhook..."
+          # -k: aaPanel uses a self-signed cert. --max-time 600: the hook runs
+          # composer install + npm build synchronously, so allow up to 10 min.
+          curl -fsS -k --max-time 600 "${{ secrets.DEPLOY_WEBHOOK_URL }}" \
+            && echo "Deploy webhook triggered OK" \
+            || { echo "Webhook call failed"; exit 1; }

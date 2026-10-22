@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airo Access Lock &mdash; ink scheme</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+    body { background: #fff; }
+    .hero { background: var(--ink-0); color: #fff; padding: 48px 28px 42px; }
+    .hero .sub { color: var(--rail-text); }
+    .hero code { color: #c9c9c9; }
+    .in { max-width: 940px; margin: 0 auto; }
+    .eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .16em; }
+    .hero h1 { font-size: 30px; margin-top: 12px; letter-spacing: -.02em; }
+    .wrapx { max-width: 940px; margin: 0 auto; padding: 36px 28px 70px; }
+    .screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
+    .screen { display: block; text-decoration: none; color: inherit; overflow: hidden; }
+    .screen:hover { box-shadow: 0 8px 22px rgba(0, 0, 0, .08); }
+    .thumb { height: 116px; border-bottom: 1px solid var(--p-border-soft); padding: 12px;
+        background: var(--p-bg); overflow: hidden; }
+    h2.sec { font-size: 19px; margin-bottom: 6px; }
+    .note { border-left: 3px solid var(--v-500); padding: 2px 0 2px 14px; }
+</style>
+
+<div class="hero">
+    <div class="in">
+        <div class="eyebrow">INK</div>
+        <h1>Airo Access Lock &amp; Control</h1>
+        <p class="sub mt8" style="max-width:620px;font-size:14px">The same screens, with the accent
+            in ink rather than violet. What is selected, current, running or part-done is marked by
+            weight and contrast instead of by hue &mdash; which is how the Shopify admin and the apps
+            that sit well inside it behave.</p>
+        <p class="sub mt8" style="max-width:620px;font-size:13px">It is one ramp apart from
+            <code>design-mockup-black/</code>: ten lines in <code>:root</code>, and nothing else in
+            either folder differs. Content types keep their own colours in both, because those are
+            the app&rsquo;s and they carry meaning rather than brand.</p>
+        <div class="row g8 mt20 wrap">
+            <a class="btn" href="welcome.html"
+               style="background:#fff;border-color:#fff;color:#1a1a1a">Open the setup</a>
+            <a class="btn" href="dashboard.html"
+               style="background:transparent;border-color:#3d3d3d;color:#fff">Open the dashboard</a>
+            <a class="btn" href="http://localhost:8744/"
+               style="background:transparent;border-color:#3d3d3d;color:#fff">See it in violet &rarr;</a>
+        </div>
+    </div>
+</div>
+
+<div class="wrapx">
+
+    <h2 class="sec">The design language</h2>
+    <p class="sub">Three pieces, shared by every screen from <code>assets/app.css</code> rather than
+        copied between them.</p>
+    <div class="screens mt20" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+        <div class="card card-p stack g8">
+            <span class="panel-eyebrow" style="color:#8a6116">--accent</span>
+            <span class="strong">Weight, not hue</span>
+            <span class="sm sub">One ramp drives every tint on every screen: ticks, meters, section
+                numbers, the selected row. Here it is ink, so emphasis comes from contrast — and
+                the violet version of this folder is one ramp away.</span>
+        </div>
+        <div class="card card-p stack g8">
+            <span class="panel-eyebrow" style="color:#8a6116">.stage</span>
+            <span class="strong">A dark mount for the shopper's view</span>
+            <span class="sm sub">A white popup on a white card has no edge and reads as empty space.
+                On black it reads as a screen.</span>
+        </div>
+        <div class="card card-p stack g8">
+            <span class="panel-eyebrow" style="color:#8a6116">.opt</span>
+            <span class="strong">The whole row is the target</span>
+            <span class="sm sub">Pickable rows that take the accent border and a tick when chosen,
+                instead of bare radio buttons with a label beside them.</span>
+        </div>
+    </div>
+
+    <h2 class="sec" style="margin-top:44px">The screens</h2>
+    <p class="sub">Every page the app renders through Inertia, in the order a merchant meets them.</p>
+
+    <div class="screens mt20">
+
+        <a class="card screen" href="welcome.html">
+            <div class="thumb">
+                <div class="card" style="height:100%;padding:8px">
+                    <div style="width:18px;height:18px;border-radius:5px;background:#1a1a1a"></div>
+                    <div style="height:7px;width:62%;border-radius:20px;background:#1a1a1a;margin-top:8px"></div>
+                    <div style="height:5px;width:84%;border-radius:20px;background:#e5e7eb;margin-top:6px"></div>
+                    <div style="height:5px;width:74%;border-radius:20px;background:#e5e7eb;margin-top:4px"></div>
+                    <div style="height:9px;width:38%;border-radius:20px;background:var(--accent);margin-top:10px"></div>
+                </div>
+            </div>
+            <div class="card-p stack g4">
+                <span class="strong">Welcome</span>
+                <span class="sm sub"><code>/onboarding</code> &middot; what the app does, and the way in</span>
+            </div>
+        </a>
+
+        <a class="card screen" href="onboarding.html">
+            <div class="thumb">
+                <div class="row g8" style="height:100%">
+                    <div class="card" style="width:52px;height:100%;padding:6px">
+                        <div class="rail-bar" style="height:4px;background:#f3f4f6;border-radius:20px">
+                            <i style="display:block;height:100%;width:25%;background:#1a1a1a;border-radius:20px"></i></div>
+                    </div>
+                    <div class="card grow" style="height:100%"></div>
+                </div>
+            </div>
+            <div class="card-p stack g4">
+                <span class="strong">Setup</span>
+                <span class="sm sub"><code>/onboarding</code> &middot; four steps across the top of one card</span>
+            </div>
+        </a>
+
+        <a class="card screen" href="dashboard.html">
+            <div class="thumb">
+                <div style="height:20px;border-radius:7px;background:#1a1a1a;margin-bottom:7px"></div>
+                <div class="row g8" style="gap:6px;height:calc(100% - 27px)">
+                    <div class="stack grow" style="gap:6px">
+                        <div class="card" style="height:34px"></div>
+                        <div class="card" style="flex:1"></div>
+                    </div>
+                    <div class="stack" style="width:44px;gap:6px">
+                        <div class="card" style="height:28px"></div>
+                        <div class="card" style="flex:1"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-p stack g4">
+                <span class="strong">Dashboard</span>
+                <span class="sm sub"><code>/</code> &middot; setup guide, extension status, book a call</span>
+            </div>
+        </a>
+
+        <a class="card screen" href="locks.html">
+            <div class="thumb">
+                <div class="card" style="height:22px;margin-bottom:7px"></div>
+                <div class="row g4" style="gap:5px;margin-bottom:7px">
+                    <div class="card" style="flex:1;height:26px"></div><div class="card" style="flex:1;height:26px"></div>
+                    <div class="card" style="flex:1;height:26px"></div>
+                </div>
+                <div class="card" style="height:28px"></div>
+            </div>
+            <div class="card-p stack g4">
+                <span class="strong">Locks</span>
+                <span class="sm sub"><code>/</code> &middot; plan card, four counts, activity per lock</span>
+            </div>
+        </a>
+
+        <a class="card screen" href="lock-builder.html">
+            <div class="thumb">
+                <div class="row g8" style="height:100%">
+                    <div class="stack grow" style="gap:6px">
+                        <div class="card" style="height:26px"></div>
+                        <div class="card" style="height:26px"></div>
+                        <div class="card" style="height:28px"></div>
+                    </div>
+                    <div class="card" style="width:62px;height:100%"></div>
+                </div>
+            </div>
+            <div class="card-p stack g4">
+                <span class="strong">Create a lock</span>
+                <span class="sm sub"><code>/lock/create</code> &middot; one page: every question, and a preview that follows</span>
+            </div>
+        </a>
+
+        <a class="card screen" href="lock-preview.html">
+            <div class="thumb">
+                <div class="stack" style="gap:6px">
+                    <div class="row g4"><div style="height:7px;width:58px;background:#c9c9c9;border-radius:3px"></div>
+                        <div style="height:7px;width:30px;background:#cdfee1;border-radius:3px"></div></div>
+                    <div class="card" style="height:30px"></div>
+                    <div class="card" style="height:30px"></div>
+                </div>
+            </div>
+            <div class="card-p stack g4">
+                <span class="strong">Lock preview</span>
+                <span class="sm sub"><code>/lock/{id}/configure</code> &middot; four read-only cards</span>
+            </div>
+        </a>
+
+        <a class="card screen" href="widgets.html">
+            <div class="thumb">
+                <div class="row g4" style="gap:5px;margin-bottom:7px">
+                    <div class="card" style="flex:1;height:26px"></div><div class="card" style="flex:1;height:26px"></div>
+                    <div class="card" style="flex:1;height:26px"></div>
+                </div>
+                <div class="card" style="height:46px"></div>
+            </div>
+            <div class="card-p stack g4">
+                <span class="strong">Widgets</span>
+                <span class="sm sub"><code>/widgetdashboard</code> &middot; three counts, colours per row, create modal</span>
+            </div>
+        </a>
+
+        <a class="card screen" href="plans.html">
+            <div class="thumb">
+                <div class="row g4" style="gap:6px;height:100%;align-items:stretch">
+                    <div class="card" style="flex:1"></div>
+                    <div class="card" style="flex:1;border:2px solid #1a1a1a"></div>
+                    <div class="card" style="flex:1"></div>
+                </div>
+            </div>
+            <div class="card-p stack g4">
+                <span class="strong">Subscriptions</span>
+                <span class="sm sub"><code>/pricing</code> &middot; three plan cards, reviews, six questions</span>
+            </div>
+        </a>
+    </div>
+
+    <h2 class="sec" style="margin-top:44px">What the current design is made of</h2>
+
+    <div class="card mt16">
+        <table class="idx">
+            <tbody>
+                <tr><td style="width:190px" class="strong">Framework</td>
+                    <td>Laravel + Inertia + React, rendered inside the Shopify admin</td></tr>
+                <tr><td class="strong">Component library</td>
+                    <td>Polaris 13 &mdash; <code>Page</code>, <code>Card</code>, <code>IndexTable</code>,
+                        <code>IndexFilters</code>, <code>Badge</code>, <code>Button</code>,
+                        <code>Modal</code>, <code>EmptyState</code></td></tr>
+                <tr><td class="strong">Accent</td>
+                    <td>Black. The blocks that were violet &mdash; the plan banner, the stat cards, the plan
+                        cards, the onboarding rail &mdash; are now black, white and grey</td></tr>
+                <tr><td class="strong">Where colour survives</td>
+                    <td><span class="row g16 wrap" style="display:inline-flex">
+                        <span class="row g4" style="display:inline-flex"><span style="width:13px;height:13px;border-radius:4px;background:#005bd3"></span>
+                            <code>#005bd3</code> links</span>
+                        <span class="row g4" style="display:inline-flex"><span style="width:13px;height:13px;border-radius:4px;background:#0c5132"></span>
+                            <code>#0c5132</code> confirmations</span>
+                        <span class="row g4" style="display:inline-flex"><span style="width:13px;height:13px;border-radius:4px;background:#fff1c2;border:1px solid #e3e3e3"></span>
+                            <code>#fff1c2</code> plan gating</span>
+                    </span></td></tr>
+                <tr><td class="strong">Resource pills</td>
+                    <td><span class="row g4 wrap" style="display:inline-flex">
+                        <span class="pill product">Product</span><span class="pill collection">Collection</span>
+                        <span class="pill page">Page</span><span class="pill blog">Blog</span>
+                        <span class="pill theme">Theme</span><span class="pill checkout">Checkout</span>
+                        <span class="pill shop">Entire store</span></span>
+                        <div class="xs sub mt8">Seven hues became one. The label already names the type, so
+                            the colour was carrying nothing the words were not &mdash; except
+                            <b>Entire store</b>, kept solid because it is the blast radius, not a
+                            category.</div></td></tr>
+                <tr><td class="strong">Switch</td>
+                    <td><span class="row g8" style="display:inline-flex"><span class="knob"></span>
+                        <code>KnobToggle</code> &mdash; the app's own, not a Polaris component</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2 class="sec" style="margin-top:44px">What the restyle changed</h2>
+    <div class="stack g16 mt16">
+        <div class="note">
+            <span class="strong">The plan banner stopped shouting.</span>
+            <p class="sm sub mt4">It was a three-stop violet gradient with decorative circles and a coloured
+                glow. It is now a flat black panel with a hairline border, so it reads as a system message
+                about the merchant's account rather than as an advertisement inside their own admin.</p>
+        </div>
+        <div class="note">
+            <span class="strong">Colour now means something.</span>
+            <p class="sm sub mt4">The app&rsquo;s violet is the accent again, but it only marks what you can
+                act on and where you are: primary buttons, the current step, the chosen card. Blue stays for
+                links, green for confirmations and feature ticks. Everything that was violet purely for
+                emphasis is black or grey.</p>
+        </div>
+        <div class="note">
+            <span class="strong">Icons are monochrome.</span>
+            <p class="sm sub mt4">Twenty-six colour emoji &mdash; shields, bolts, rockets, padlocks &mdash;
+                became stroked SVGs that inherit the text colour. An orange lightning bolt beside a black
+                heading undoes a neutral palette faster than anything else on a page.</p>
+        </div>
+    </div>
+
+    <h2 class="sec" style="margin-top:44px">Things worth knowing when reading these</h2>
+    <div class="stack g16 mt16">
+        <div class="note">
+            <span class="strong">The lock builder is not a wizard.</span>
+            <p class="sm sub mt4">The file is called <code>LockCreationFlow.jsx</code> and there is a
+                <code>StepIndicator</code> component in the folder, but the screen that ships is a single
+                page with a 1fr / 340px grid. The step indicator is unused by it.</p>
+        </div>
+        <div class="note">
+            <span class="strong">Two design languages sit side by side.</span>
+            <p class="sm sub mt4">Polaris supplies the page frame, cards and table; the violet banner, stat
+                cards and plan cards are hand-written inline styles. They do not share tokens, so the
+                greys come from two different palettes &mdash; Polaris <code>#616161</code> next to
+                Tailwind <code>#9ca3af</code>.</p>
+        </div>
+        <div class="note">
+            <span class="strong">Lock conditions are one flat group.</span>
+            <p class="sm sub mt4">The builder renders <code>groups[0]</code> only, with an AND/OR operator
+                and a row per condition. There is no second group in the UI even though the data model
+                allows one.</p>
+        </div>
+        <div class="note">
+            <span class="strong">Popup wording lives in a modal.</span>
+            <p class="sm sub mt4">It is reached from a button inside the Widgets card in the right-hand
+                column, rather than having a card of its own.</p>
+        </div>
+    </div>
+
+    <p class="xs sub" style="margin-top:34px">Static HTML, CSS and a little JavaScript. No framework and no
+        build step &mdash; open any file directly in a browser. Counts, names and dates are invented;
+        every label, heading, badge and colour is taken from the source.</p>
+</div>
+</html>

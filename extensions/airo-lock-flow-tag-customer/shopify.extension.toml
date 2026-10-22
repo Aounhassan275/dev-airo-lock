@@ -1,0 +1,25 @@
+api_version = "2025-10"
+
+[[extensions]]
+name = "Airo Access Lock & Control tag customer"
+uid = "9cc8cf2f-60b2-57ba-08c3-c264d82189868c9af0ad"
+type = "flow_action"
+handle = "airo-lock-tag-customer"
+description = "Applies every tag in the lock's required-tags conditions to a customer, granting access."
+runtime_url = "https://lock.airoapps.com/flow/action/tag-customer"
+
+  [settings]
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "customerId"
+    name = "Customer ID"
+    description = "Numeric Shopify customer id to tag."
+    required = true
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "lockId"
+    name = "Lock ID"
+    description = "Internal Airo Access Lock & Control lock id whose tag conditions should be applied."
+    required = true

@@ -1,0 +1,45 @@
+# DECLARED 2025-10, BUILT WITH THE 2025-07 REACT PACKAGE. That mismatch is
+# deliberate and forced:
+#
+#   - Shopify stopped accepting 2025-07 for checkout UI extensions; the
+#     platform now requires 2025-10 or newer, so a deploy is rejected outright.
+#   - @shopify/ui-extensions-react has never shipped a release past the
+#     2025-07 tag (2025.7.4). Its only newer version, 2026.0.0, carries no
+#     API-version dist-tag and peer-pins an untagged @shopify/ui-extensions
+#     2025.8.0, so it is not the 2026-01 React release.
+#   - 2025.7.4 hard peer-pins @shopify/ui-extensions@2025.7.4, so the two
+#     cannot be bumped independently.
+#
+# Everything this extension imports — reactExtension, the buyer-identity and
+# attribute hooks, Banner/BlockStack/Text/TextField — is long-stable and
+# unchanged across these versions, so declaring the newer API version is safe
+# in practice. The real fix is migrating off the React wrapper to the
+# Preact/web-component authoring model that 2025-10+ expects; until then this
+# line is what keeps deploys working. See section 4.4 of DEVELOPER.md.
+api_version = "2025-10"
+
+[[extensions]]
+name = "Airo Access Lock & Control Checkout Block"
+handle = "airo-lock-checkout-block"
+uid = "fca6c6b3-9521-eefc-833f-e4f2934e5cacb20e4938"
+type = "ui_extension"
+
+# header.render-after renders on every checkout — physical, digital, and
+# store-pickup — so the passcode field and banner are always available.
+# delivery-address (the previous target) is absent on no-ship carts, which
+# left the server Function hard-blocking passcode locks with no input field.
+[[extensions.targeting]]
+module = "./src/Checkout.jsx"
+target = "purchase.checkout.header.render-after"
+
+[extensions.capabilities]
+api_access = true
+block_progress = true
+
+# Required so useAppMetafields can read the shop's checkout rule. Without
+# this declaration the extension receives no metafields and renders null.
+# The Laravel backend writes this metafield on the shop via the Admin API
+# (AccessLockcontroller::updateCheckoutMetafield).
+[[extensions.metafields]]
+namespace = "access_control"
+key = "checkout_rule"

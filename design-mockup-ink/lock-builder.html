@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create a lock &mdash; Airo Access Lock</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+    /* /lock/create and /lock/{lock}/configure — one page.
+     *
+     * The setup flow asks a store's first lock four questions, one step at a
+     * time, because a first lock is something you are being walked through.
+     * Every lock after that is a form you have opened on purpose, and editing
+     * one is a form you opened to change a single thing in. A wizard makes
+     * that four clicks deep, and gives you no way to see the whole lock at
+     * once.
+     *
+     * So: the same controls, every one of them on the page, in the order the
+     * lock reads — what it covers, who gets in, what they see, how it
+     * behaves, whether it is running. The preview rides along in the rail
+     * rather than being a step you have to reach, which is the thing the
+     * stepper could not do.
+     *
+     * The controls themselves are in lock-controls.js, shared with the flow,
+     * so the two screens cannot drift apart. */
+
+    /* --------------------------------------------------------- the embed -- */
+    /* One row, not the full-page block the flow's last step uses: here it is
+       one of five sections rather than the only thing being asked. */
+    .embed { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .embed-ic {
+        width: 38px; height: 38px; border-radius: 11px; flex: none; display: grid;
+        place-items: center; background: var(--p-warning-bg); color: var(--p-warning-fg);
+    }
+    .embed.on .embed-ic { background: var(--p-success-bg); color: var(--p-success-fg); }
+    .embed-ic svg { width: 20px; height: 20px; }
+    .embed-t { font-size: 13.5px; font-weight: 650; }
+    .embed-d { display: block; font-size: 12.5px; color: var(--p-text-sub); margin-top: 2px; }
+    .embed-act { margin-left: auto; }
+    .embed-note { display: block; font-size: 11.5px; color: var(--p-text-disabled);
+                  margin-top: 10px; line-height: 1.4; }
+    .howto { list-style: none; margin: 14px 0 0; padding: 0;
+             display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .howto li {
+        display: flex; align-items: flex-start; gap: 9px; font-size: 12px; line-height: 1.4;
+        padding: 10px 11px; border: 1px solid var(--p-border-soft); border-radius: 10px;
+    }
+    .howto-n {
+        width: 19px; height: 19px; border-radius: 50%; flex: none; display: grid;
+        place-items: center; font-size: 10.5px; font-weight: 700;
+        background: var(--v-50); color: var(--accent-deep);
+    }
+
+    /* Only the embed section is this page's own. */
+    @media (max-width: 760px) {
+        .howto { grid-template-columns: 1fr; }
+        .embed-act { margin-left: 0; width: 100%; }
+    }
+</style>
+
+<main class="page full">
+
+    <div class="pg-head">
+        <div class="grow" style="min-width:0">
+            <a class="back-l" href="locks.html">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M15 5l-7 7 7 7"></path></svg>
+                Locks
+            </a>
+            <div class="row g8 wrap" style="margin-top:2px">
+                <h1 class="pg-t" id="pageTitle">Create a lock</h1>
+                <span class="xs sub hide" id="lockId">#14</span>
+                <span class="badge hide" id="liveTag">Running</span>
+            </div>
+        </div>
+        <div class="row g8 wrap">
+            <button class="btn hide" id="deleteLock">Delete</button>
+            <a class="btn" href="locks.html" id="cancel">Cancel</a>
+            <button class="btn primary" id="save" disabled>Create lock</button>
+        </div>
+    </div>
+
+    <div class="one">
+        <div class="one-main">
+
+            <!-- ================================================ 1. scope -->
+            <section class="sec-c">
+                <div class="sec-hd">
+                    <span class="sec-n">1</span>
+                    <div class="grow">
+                        <h2 class="sec-t2">What to lock</h2>
+                        <p class="sec-d2">Name it, choose the content, and decide what locking
+                            actually does to it.</p>
+                    </div>
+                </div>
+                <div class="sec-b">
+                    <div class="field" style="max-width:430px">
+                        <label class="label" for="lockName">Lock name <span class="req" aria-hidden="true">*</span></label>
+                        <input class="input" id="lockName" aria-required="true" placeholder="e.g. Wholesale catalogue">
+                        <span class="help">Only you see this. It appears in your locks list.</span>
+                    </div>
+
+                    <div class="divider" style="margin:14px 0"></div>
+
+                    <span class="sec-l" style="display:block;margin-bottom:7px">Content to lock <span class="req" aria-hidden="true">*</span></span>
+                    <div class="opts2" id="scope">
+                        <button class="opt" data-sum="Products">
+                            <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.2l9-5 9 5v7.6l-9 5-9-5z"/><path d="M3 8.2l9 5 9-5M12 13.2v7.6"/></svg></span>
+                            <span><span class="opt-t">Products</span>
+                            <span class="opt-d">Individual products, by hand or by a rule.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                        <button class="opt" data-sum="Collections">
+                            <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span>
+                            <span><span class="opt-t">Collections</span>
+                            <span class="opt-d">Lock a trade catalogue, leave the rest open.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                        <button class="opt" data-sum="Pages">
+                            <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span>
+                            <span><span class="opt-t">Pages</span>
+                            <span class="opt-d">Course pages, downloads, price lists.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                        <button class="opt" data-sum="Blogs">
+                            <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg></span>
+                            <span><span class="opt-t">Blogs</span>
+                            <span class="opt-d">A whole blog, for members-only writing.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                        <button class="opt" data-sum="Hide price rule">
+                            <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.5l8-8H20v8.5l-8 8z"/><circle cx="15.8" cy="8.2" r="1.3"/><path d="M4 20l16-16"/></svg></span>
+                            <span><span class="opt-t">Hide price rule</span>
+                            <span class="opt-d">Products stay visible; price and cart hidden.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                        <button class="opt" data-sum="Liquid theme">
+                            <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s5.5 5.3 5.5 9a5.5 5.5 0 11-11 0C6.5 8.3 12 3 12 3z"/></svg></span>
+                            <span><span class="opt-t">Liquid theme</span>
+                            <span class="opt-d">Target a theme rather than its pages.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                        <button class="opt" data-sum="Store">
+                            <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5V20h16V9.5"/><path d="M3 9.5L4.8 4h14.4L21 9.5a3 3 0 01-6 0 3 3 0 01-6 0 3 3 0 01-6 0z"/><path d="M10 20v-5h4v5"/></svg></span>
+                            <span><span class="opt-t">Store</span>
+                            <span class="opt-d">Every page of the storefront asks for access.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                        <button class="opt" data-sum="Checkout">
+                            <span class="opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2.2l2.1 10.5a1.6 1.6 0 001.6 1.3h8.3a1.6 1.6 0 001.6-1.3L20.5 7H6"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg></span>
+                            <span><span class="opt-t">Checkout (Plus)</span>
+                            <span class="opt-d">Stop a locked item being bought via a cart link.</span></span>
+                            <span class="opt-tick"></span>
+                        </button>
+                    </div>
+
+                    <div class="pickbar mt10" id="itemsRow">
+                        <span class="pickbar-ic">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 7h16M4 12h16M4 17h10"></path>
+                            </svg>
+                        </span>
+                        <span class="grow">
+                            <span class="sm strong" id="itemsText">Choose a type above first</span>
+                            <span class="help" id="itemsSub">Pick the exact items this lock covers.</span>
+                        </span>
+                        <button class="btn hide" id="clearItems">Clear all</button>
+                        <button class="btn" id="browse" disabled>Choose items</button>
+                    </div>
+
+                    <div class="divider" style="margin:14px 0"></div>
+
+                    <div class="field" id="actionWrap" style="max-width:430px">
+                        <span class="label">When locked, do this</span>
+                        <div class="acts tiles" id="action" role="radiogroup"
+                             aria-label="When locked, do this"></div>
+                    </div>
+
+                    <!-- Hide Price Rule swaps the action for its own settings. -->
+                    <div id="priceWrap" class="hide" style="max-width:480px">
+                        <span class="sec-l" style="display:block;margin-bottom:7px">Price visibility</span>
+                        <div class="field">
+                            <label class="label" for="priceMsg">Price hidden message</label>
+                            <input class="input" id="priceMsg" placeholder="Sign in to see price">
+                            <span class="help">Message to display in place of the price.</span>
+                        </div>
+                        <span class="label mt12">Visibility options</span>
+                        <div class="acts">
+                            <label class="act">
+                                <input type="checkbox" checked>
+                                <span class="act-box" aria-hidden="true"></span>
+                                <span class="act-c">
+                                    <span class="act-t">Hide on all pages (Collections, Search, etc.)</span>
+                                    <span class="act-d">Price is hidden wherever the product appears.</span>
+                                </span>
+                            </label>
+                            <label class="act">
+                                <input type="checkbox" checked>
+                                <span class="act-box" aria-hidden="true"></span>
+                                <span class="act-c">
+                                    <span class="act-t">Disallow Add to Cart / Checkout</span>
+                                    <span class="act-d">Hides Add to Cart buttons and prevents checkout.</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================ 2. who gets in -->
+            <section class="sec-c">
+                <div class="sec-hd">
+                    <span class="sec-n">2</span>
+                    <div class="grow">
+                        <h2 class="sec-t2">Who gets in</h2>
+                        <p class="sec-d2">The checks a visitor has to pass before the lock opens.</p>
+                    </div>
+                    <div class="seg" id="operator" role="radiogroup"
+                         aria-label="How the conditions combine">
+                        <label class="seg-b on">
+                            <input type="radio" name="op" value="AND" checked>
+                            <span class="seg-t">AND</span>
+                            <span class="seg-d">all must match</span>
+                        </label>
+                        <label class="seg-b">
+                            <input type="radio" name="op" value="OR">
+                            <span class="seg-t">OR</span>
+                            <span class="seg-d">any can match</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="sec-b">
+                    <p class="help" id="operatorHelp" style="margin-bottom:11px">
+                        Customer must meet all of the conditions below to unlock access.</p>
+
+                    <div id="conds"></div>
+
+                    <button class="addtile" id="addCond">
+                        <span class="addtile-p" aria-hidden="true">&#43;</span> Add condition</button>
+                    <p class="help mt8" id="condCount">1 condition</p>
+                </div>
+            </section>
+
+            <!-- ====================================== 3. what visitors see -->
+            <section class="sec-c" id="secSee">
+                <div class="sec-hd">
+                    <span class="sec-n">3</span>
+                    <div class="grow">
+                        <h2 class="sec-t2">What visitors see</h2>
+                        <p class="sec-d2" id="seeNote">Choose how the popup looks, and what it says
+                            on this lock.</p>
+                    </div>
+                    <span class="tag form" id="needTag">Form</span>
+                </div>
+                <div class="sec-b">
+                    <div class="notice hide" id="noPopup">
+                        <span aria-hidden="true">&#9432;</span>
+                        <span><b>No popup is shown for this action.</b>
+                            <span id="noPopupWhy"></span> There is no widget or wording to set.</span>
+                    </div>
+
+                    <div id="popupBlock">
+                        <div class="fields2">
+                            <div class="field" id="formWrap">
+                                <span class="label">Form widget design</span>
+                                <div class="picks-row">
+                                <div class="picks" id="formDesign" role="radiogroup" aria-label="Form widget design">
+                                    <label class="pick on" data-bg="#ffffff" data-fg="#1a1a1a"
+                                           data-btn="#1a1a1a" data-btnfg="#ffffff">
+                                        <input type="radio" name="formDesign" value="" checked>
+                                        <span class="pick-sw" aria-hidden="true"
+                                              style="background:#ffffff;color:#1a1a1a"><i style="background:#1a1a1a"></i></span>
+                                        <span class="pick-n">Default design</span>
+                                    </label>
+                                    <label class="pick" data-bg="#111a33" data-fg="#dfe5f5"
+                                           data-btn="#ffffff" data-btnfg="#111a33">
+                                        <input type="radio" name="formDesign" value="Trade gate">
+                                        <span class="pick-sw" aria-hidden="true"
+                                              style="background:#111a33;color:#dfe5f5"><i style="background:#ffffff"></i></span>
+                                        <span class="pick-n">Trade gate</span>
+                                    </label>
+                                    <label class="pick" data-bg="#f5efe4" data-fg="#4a3a1e"
+                                           data-btn="#8a6a30" data-btnfg="#ffffff">
+                                        <input type="radio" name="formDesign" value="Members notice">
+                                        <span class="pick-sw" aria-hidden="true"
+                                              style="background:#f5efe4;color:#4a3a1e"><i style="background:#8a6a30"></i></span>
+                                        <span class="pick-n">Members notice</span>
+                                    </label>
+                                </div>
+                                <button type="button" class="pick-add" data-new="form">
+                                    <span class="pick-plus" aria-hidden="true">+</span>
+                                    <span class="pick-n">Create widget</span>
+                                </button>
+                                </div>
+                                <span class="help" id="widgetKindWhy">Used for conditions that
+                                    need user input (passcode, age verification).</span>
+                            </div>
+
+                            <div class="field hide" id="textWrap">
+                                <span class="label">Text widget design</span>
+                                <div class="picks-row">
+                                <div class="picks" id="textDesign" role="radiogroup" aria-label="Text widget design">
+                                    <label class="pick on" data-bg="#ffffff" data-fg="#1a1a1a"
+                                           data-btn="#1a1a1a" data-btnfg="#ffffff">
+                                        <input type="radio" name="textDesign" value="" checked>
+                                        <span class="pick-sw" aria-hidden="true"
+                                              style="background:#ffffff;color:#1a1a1a"><i style="background:#1a1a1a"></i></span>
+                                        <span class="pick-n">Default design</span>
+                                    </label>
+                                    <label class="pick" data-bg="#f5efe4" data-fg="#4a3a1e"
+                                           data-btn="#8a6a30" data-btnfg="#ffffff">
+                                        <input type="radio" name="textDesign" value="Members notice">
+                                        <span class="pick-sw" aria-hidden="true"
+                                              style="background:#f5efe4;color:#4a3a1e"><i style="background:#8a6a30"></i></span>
+                                        <span class="pick-n">Members notice</span>
+                                    </label>
+                                </div>
+                                <button type="button" class="pick-add" data-new="text">
+                                    <span class="pick-plus" aria-hidden="true">+</span>
+                                    <span class="pick-n">Create widget</span>
+                                </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Making a widget, in place. The device in the rail is its
+                             preview — it repaints as the palette is picked. -->
+                        <div class="hide" id="newWidget" style="margin-top:14px;border-top:1px solid var(--p-border-soft);padding-top:14px">
+                            <div class="between" style="margin-bottom:9px">
+                                <span class="sec-l" style="margin:0">New widget</span>
+                                <span class="row g4">
+                                    <button class="btn plain xs" id="wLangSync">
+                                        <span class="pick-sync">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M20 11a8 8 0 0 0-14-4.5L4 9"></path>
+                                                <path d="M4 13a8 8 0 0 0 14 4.5L20 15"></path>
+                                                <path d="M4 5v4h4M20 19v-4h-4"></path></svg>
+                                            Sync languages
+                                        </span>
+                                    </button>
+                                </span>
+                            </div>
+
+                            <div class="fields2">
+                                <div class="field">
+                                    <label class="label" for="wNameIn">Widget name</label>
+                                    <input class="input" id="wNameIn" placeholder="e.g. Trade gate">
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="wLang">Popup language</label>
+                                    <select class="select" id="wLang">
+                                        <option>Follow the storefront language (recommended)</option>
+                                        <option>English</option><option>Deutsch</option>
+                                        <option>Fran&ccedil;ais</option>
+                                    </select>
+                                    <span class="help" id="wLangNote">Shopify decides which languages
+                                        your store publishes.</span>
+                                </div>
+                            </div>
+
+                            <div class="row g8 new-h">
+                                <span class="sec-l">Colour palettes</span><span class="tag">Basic</span>
+                            </div>
+                            <div class="palettes" id="palettes"></div>
+
+                            <div class="row g8 new-h">
+                                <span class="sec-l">Colours</span><span class="tag">Basic</span>
+                            </div>
+                            <div class="row g8 wrap" id="colours">
+                                <label class="swatch"><input type="color" data-k="text" value="#FFFFFF">
+                                    <span>Text</span></label>
+                                <label class="swatch"><input type="color" data-k="card" value="#6B7280">
+                                    <span>Card</span></label>
+                                <label class="swatch"><input type="color" data-k="buttonBg" value="#000000">
+                                    <span>Button BG</span></label>
+                                <label class="swatch"><input type="color" data-k="buttonText" value="#FFFFFF">
+                                    <span>Button text</span></label>
+                            </div>
+
+                            <span class="sec-l new-h" style="display:block">Style</span>
+                            <div class="wstyle">
+                                <div class="field"><label class="label" for="wPad">Card pad</label>
+                                    <div class="row g8"><input class="input" id="wPad" value="10">
+                                    <span class="sm sub">px</span></div></div>
+                                <div class="field"><label class="label" for="wRad">Card rad</label>
+                                    <div class="row g8"><input class="input" id="wRad" value="12">
+                                    <span class="sm sub">px</span></div></div>
+                                <div class="field">
+                                    <label class="label" for="wBtnText">Button text</label>
+                                    <input class="input" id="wBtnText" placeholder="Submit">
+                                </div>
+                            </div>
+                            <span class="help" id="newNote" style="display:block;margin-top:10px">
+                                Saved to your widget library and reusable by any lock.</span>
+
+                            <div class="row g8 new-foot">
+                                <button class="btn" id="newCancel">Cancel</button>
+                                <button class="btn primary" id="newSave">Create widget</button>
+                            </div>
+                        </div>
+
+                        <div class="divider" id="saysRule" style="margin:14px 0"></div>
+
+                        <div id="saysBox">
+                            <span class="sec-l" style="display:block;margin-bottom:5px">What the
+                                popup says</span>
+                            <p class="help" id="saysCopy">No design is selected, so it uses the
+                                default look. Below is what it <em>says</em>, for this lock only.</p>
+                            <p class="help hide" id="saysOther"></p>
+                        </div>
+
+                        <div id="wordBlock">
+                        <div class="between" style="flex:none;margin-top:4px">
+                            <span class="sec-l" style="margin:0">Wording for this lock</span>
+                            <select class="select" id="wordLang" style="width:auto;padding:4px 9px;font-size:12px">
+                                <option>English (primary)</option><option>Deutsch</option>
+                                <option>Fran&ccedil;ais</option>
+                            </select>
+                        </div>
+
+                        <div class="wfields mt10" style="flex:none">
+                            <div class="field"><label class="label" for="wTitle">Title</label>
+                                <input class="input" id="wTitle" placeholder="Members only"></div>
+                            <div class="field"><label class="label" for="wMsg">Message</label>
+                                <input class="input" id="wMsg" placeholder="Access restricted."></div>
+                            <div class="field" data-forfield="Passcode">
+                                <label class="label" for="wPL">Passcode box &mdash; label</label>
+                                <input class="input" id="wPL" placeholder="Passcode"></div>
+                            <div class="field" data-forfield="Passcode">
+                                <label class="label" for="wPH">Passcode box &mdash; hint inside</label>
+                                <input class="input" id="wPH" placeholder="Enter code"></div>
+                            <div class="field hide" data-forfield="Email address">
+                                <label class="label" for="wEL">Email box &mdash; label</label>
+                                <input class="input" id="wEL" placeholder="Email address"></div>
+                            <div class="field hide" data-forfield="Email address">
+                                <label class="label" for="wEH">Email box &mdash; hint inside</label>
+                                <input class="input" id="wEH" placeholder="you@example.com"></div>
+                            <div class="field" data-forbutton><label class="label" for="wBtn">Button</label>
+                                <input class="input" id="wBtn" placeholder="Unlock"></div>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================== 4. behaviour -->
+            <section class="sec-c">
+                <div class="sec-hd">
+                    <span class="sec-n">4</span>
+                    <div class="grow">
+                        <h2 class="sec-t2">How it behaves</h2>
+                        <p class="sec-d2">How long access lasts, where blocked visitors go, and
+                            when the lock runs. All optional.</p>
+                    </div>
+                </div>
+                <div class="sec-b">
+                    <div class="two-col">
+                        <div>
+                            <div class="sect">
+                                <span class="sec-l">How long access lasts</span>
+                                <div class="field">
+                                    <span class="label">After a customer unlocks this</span>
+                                    <div class="acts" role="radiogroup" aria-label="After a customer unlocks this">
+                                        <label class="act on">
+                                            <input type="radio" name="reprompt" value="device" checked>
+                                            <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="12.5" rx="2"/><path d="M8 20.5h8M12 16.5v4"/></svg></span>
+                                            <span class="act-c">
+                                                <span class="act-t">Stay unlocked on this device</span>
+                                                <span class="act-d">They unlock once and are not asked again on that browser.</span>
+                                            </span>
+                                            <span class="act-tick" aria-hidden="true"></span>
+                                        </label>
+                                        <label class="act">
+                                            <input type="radio" name="reprompt" value="session">
+                                            <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M2.5 8.5h19M6 6.2h.01M8.6 6.2h.01"/></svg></span>
+                                            <span class="act-c">
+                                                <span class="act-t">Ask again next browsing session</span>
+                                                <span class="act-d">The unlock lasts until they close the browser.</span>
+                                            </span>
+                                            <span class="act-tick" aria-hidden="true"></span>
+                                        </label>
+                                        <label class="act">
+                                            <input type="radio" name="reprompt" value="always">
+                                            <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14-4.5L4 9"/><path d="M4 13a8 8 0 0 0 14 4.5L20 15"/><path d="M4 5v4h4M20 19v-4h-4"/></svg></span>
+                                            <span class="act-c">
+                                                <span class="act-t">Ask on every page view</span>
+                                                <span class="act-d">Every locked page asks again, every time.</span>
+                                            </span>
+                                            <span class="act-tick" aria-hidden="true"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sect">
+                                <span class="sec-l">Redirect and search engines</span>
+                                <div class="field">
+                                    <label class="label" for="redirect">Redirect URL (optional)</label>
+                                    <input class="input" id="redirect" placeholder="https://">
+                                    <span class="help">Send blocked visitors here instead of showing
+                                        the popup.</span>
+                                </div>
+                                <div class="field mt12">
+                                    <label class="label">Search engines</label>
+                                    <label class="chk" style="margin-top:5px"><input type="checkbox">
+                                        <span>Hide from search engines</span></label>
+                                    <span class="help">Adds a noindex meta tag so Googlebot won&rsquo;t
+                                        index the locked page.</span>
+                                </div>
+                            </div>
+
+                            <div class="sect" id="variantWrap">
+                                <span class="sec-l">Variant behaviour (product locks only)</span>
+                                <div class="field">
+                                    <span class="label">When a variant is locked</span>
+                                    <div class="seg wide" role="radiogroup" aria-label="When a variant is locked">
+                                        <label class="seg-b on">
+                                            <input type="radio" name="vLocked" value="hide" checked>
+                                            <span class="seg-t">Hide it entirely</span>
+                                        </label>
+                                        <label class="seg-b">
+                                            <input type="radio" name="vLocked" value="disable">
+                                            <span class="seg-t">Show it, but disabled</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="field mt12">
+                                    <span class="label">When all variants are locked</span>
+                                    <div class="chips" role="radiogroup" aria-label="When all variants of a product are locked">
+                                        <label class="chip on">
+                                            <input type="radio" name="vAll" value="hide" checked>
+                                            <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5c2 0 3.7.6 5.1 1.5M22 12s-3.6 6.5-10 6.5c-2.2 0-4-.7-5.4-1.7"/><path d="M3 3l18 18"/></svg></span>
+                                            <span class="chip-t">Hide the product entirely</span>
+                                            <span class="act-tick" aria-hidden="true"></span>
+                                        </label>
+                                        <label class="chip">
+                                            <input type="radio" name="vAll" value="show">
+                                            <span class="act-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5 10 6.5 10 6.5-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg></span>
+                                            <span class="chip-t">Leave the product visible</span>
+                                            <span class="act-tick" aria-hidden="true"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="sect">
+                                <span class="sec-l">Schedule (optional)</span>
+                                <div class="field">
+                                    <label class="label">Activate on</label>
+                                    <div class="row g8">
+                                        <input class="input" placeholder="mm/dd/yyyy">
+                                        <input class="input" style="width:110px" placeholder="--:--">
+                                    </div>
+                                    <span class="help">Leave blank to activate immediately.</span>
+                                </div>
+                                <div class="field mt12">
+                                    <label class="label">Expire on</label>
+                                    <div class="row g8">
+                                        <input class="input" placeholder="mm/dd/yyyy">
+                                        <input class="input" style="width:110px" placeholder="--:--">
+                                    </div>
+                                    <span class="help">Leave blank for no expiration.</span>
+                                </div>
+                            </div>
+
+                            <div class="sect">
+                                <span class="sec-l">Status</span>
+                                <div class="row g8" style="margin-bottom:4px">
+                                    <button class="toggle" id="enabled" aria-label="Enabled"></button>
+                                    <span class="sm" id="enabledLabel">Enabled</span>
+                                </div>
+                                <span class="help">A disabled lock stays saved but stops running on
+                                    your storefront.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================= 5. turn it on -->
+            <section class="sec-c" id="secEmbed">
+                <div class="sec-hd">
+                    <span class="sec-n">5</span>
+                    <div class="grow">
+                        <h2 class="sec-t2">Turn it on</h2>
+                        <p class="sec-d2">Airo runs through a theme app embed. Without it, a saved
+                            lock is not protecting anything.</p>
+                    </div>
+                </div>
+                <div class="sec-b">
+                    <div class="embed" id="embedCard">
+                        <span class="embed-ic" id="embedIc" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 9v4M12 17h.01"></path>
+                                <path d="M10.3 3.9L2.4 17.2A2 2 0 004.1 20.2h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"></path>
+                            </svg>
+                        </span>
+                        <span style="min-width:0">
+                            <span class="embed-t" id="embedT">App embed is off</span>
+                            <span class="embed-d" id="embedD">Your locks will not run on the
+                                storefront until you turn it on.</span>
+                        </span>
+                        <span class="row g8 embed-act">
+                            <a class="btn primary" id="embedGo" href="#" target="_blank"
+                               rel="noopener noreferrer">Enable in theme editor</a>
+                            <button class="btn" id="embedCheck">Check again</button>
+                        </span>
+                    </div>
+                    <span class="embed-note" id="embedNote">Opens the editor with the embed already
+                        switched on &mdash; you only have to press Save.</span>
+
+                    <ol class="howto" id="howto">
+                        <li><span class="howto-n">1</span><span><strong>Online Store &rsaquo;
+                            Themes</strong>, then <strong>Customize</strong> your live theme.</span></li>
+                        <li><span class="howto-n">2</span><span>Open <strong>App embeds</strong> in
+                            the left panel.</span></li>
+                        <li><span class="howto-n">3</span><span>Switch on <strong>Airo Access
+                            Lock</strong> and press <strong>Save</strong>.</span></li>
+                    </ol>
+                </div>
+            </section>
+        </div>
+
+        <!-- ----------------------------------------------------------- rail -->
+        <aside class="one-rail">
+            <div class="rail-c">
+                <div class="stage">
+                    <div class="device" data-preview-device>
+                        <div class="sk" id="sk3">
+                            <i style="width:46%;height:12px"></i><i class="gap"></i>
+                            <i></i><i style="width:88%"></i><i style="width:70%"></i><i class="gap"></i>
+                            <i style="width:40%;height:11px"></i><i></i><i style="width:80%"></i>
+                        </div>
+                        <div class="veil" id="veil3">
+                            <div class="hide" id="note3"
+                                 style="border:1px dashed #6e6e6e;border-radius:10px;padding:14px;
+                                        text-align:center;color:#8a8a8a;font-size:10.5px;line-height:1.4">
+                                <span id="note3Text"></span>
+                            </div>
+                            <div class="lk" id="card3" style="background:#fff;color:#1a1a1a">
+                                <div class="lk-ico">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="1.8" stroke-linecap="round"><rect x="4" y="10.5" width="16" height="10" rx="2.5"></rect>
+                                    <path d="M8 10.5V7.5a4 4 0 018 0v3"></path></svg>
+                                </div>
+                                <div class="lk-t" id="t3">Members only</div>
+                                <div class="lk-m" id="m3">Access restricted.</div>
+                                <div id="f3"></div>
+                                <div class="lk-b" id="b3" style="background:#1a1a1a;color:#fff">Unlock</div>
+                            </div>
+                        </div>
+                        <span class="dev-badge hide" id="devBadge">Not running yet</span>
+                    </div>
+                    <span class="stage-cap" id="cap3">What shoppers see</span>
+                </div>
+
+                <ol class="osums">
+                    <li class="sum" id="sum1"><span class="sum-k">Protects</span>
+                        <span class="sum-v">Nothing chosen yet</span></li>
+                    <li class="sum" id="sum2"><span class="sum-k">Opens for</span>
+                        <span class="sum-v">—</span></li>
+                    <li class="sum" id="sum3"><span class="sum-k">Shows</span>
+                        <span class="sum-v">—</span></li>
+                </ol>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Shopify's contextual bar: it turns up once there is something to save. -->
+    <div class="savebar" id="savebar">
+        <div class="grow" style="min-width:0">
+            <span class="sb-t">Unsaved changes</span>
+            <span class="sb-d" id="sbNeeds">Nothing is saved until you press Save.</span>
+        </div>
+        <a class="btn" href="locks.html">Discard</a>
+        <button class="btn primary" id="saveBottom" disabled>Create lock</button>
+    </div>
+</main>
+
+<!-- ========================================================= item picker === -->
+<div class="modal-bg hide" id="pickModal">
+    <div class="modal" style="max-width:640px">
+        <div class="modal-head">
+            <h2 class="h-md" id="pickTitle">Select products</h2>
+            <button class="btn plain" data-close="pickModal" aria-label="Close">&#10005;</button>
+        </div>
+
+        <div style="padding:13px 16px;background:#fafafa;border-bottom:1px solid var(--p-border-soft)">
+            <div class="row g8 wrap">
+                <div class="searchbar grow" style="background:#fff">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+                    <span id="pickSearch">Search products&hellip;</span>
+                </div>
+                <select class="select" style="width:auto"><option>Title</option>
+                    <option>Vendor</option><option>ID</option></select>
+                <button class="btn">Add filter</button>
+            </div>
+        </div>
+
+        <div class="pick-bar" id="pickBar">
+            <span class="pick-n none" id="pickShowing">6 products</span>
+            <span class="grow"></span>
+            <button class="btn" id="pickSync">
+                <span class="pick-sync">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 11a8 8 0 0 0-14-4.5L4 9"></path>
+                        <path d="M4 13a8 8 0 0 0 14 4.5L20 15"></path>
+                        <path d="M4 5v4h4M20 19v-4h-4"></path></svg>
+                    Refresh from Shopify
+                </span>
+            </button>
+            <button class="btn" id="pickAll">Select all</button>
+        </div>
+
+        <div class="pick-list" id="pickList" style="border-top:1px solid var(--p-border-soft)"></div>
+
+        <div class="modal-foot between">
+            <span class="xs sub" id="pickCount">Nothing selected yet</span>
+            <div class="row g8">
+                <button class="btn" data-close="pickModal">Cancel</button>
+                <button class="btn primary" id="pickAdd" disabled>Add selected</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =========================================================== condition === -->
+<div class="modal-bg hide" id="condModal">
+    <div class="modal" style="max-width:520px">
+        <div class="modal-head">
+            <h2 class="h-md" id="condTitle">Add a condition</h2>
+            <button class="btn plain" data-close="condModal" aria-label="Close">&#10005;</button>
+        </div>
+        <div style="padding:16px">
+            <div class="row g8" style="margin-bottom:12px">
+                <span class="tag">Permit if</span>
+                <span class="tag form" id="condKind">Form</span>
+            </div>
+            <div class="cond-f">
+                <div class="field">
+                    <label class="label" for="condType">Condition type</label>
+                    <select class="select" id="condType"></select>
+                </div>
+                <div class="field" id="condField"></div>
+            </div>
+        </div>
+        <div class="modal-foot between">
+            <span class="xs sub" id="condNote">Every condition is checked when a shopper arrives.</span>
+            <div class="row g8">
+                <button class="btn" data-close="condModal">Cancel</button>
+                <button class="btn primary" id="condSave">Add condition</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================== bulk entry === -->
+<div class="modal-bg hide" id="bulkModal">
+    <div class="modal" style="max-width:560px">
+        <div class="modal-head">
+            <h2 class="h-md" id="bulkTitle">Add in bulk</h2>
+            <button class="btn plain" data-close="bulkModal" aria-label="Close">&#10005;</button>
+        </div>
+        <div style="padding:16px">
+            <p class="sm sub" id="bulkHelp">One per line. Commas, tabs and semicolons all work, and a
+                header row is ignored.</p>
+            <textarea class="textarea mono" id="bulkText" style="min-height:150px;margin-top:10px;font-size:12px"
+                      placeholder="hana@mori.jp,TRADE-8841"></textarea>
+            <div class="row g8 mt12 wrap">
+                <span class="tag live" id="bulkValid">0 valid</span>
+                <span class="tag" id="bulkDupes">0 duplicates merged</span>
+                <span class="grow"></span>
+                <button class="btn plain xs">&#8679; Upload CSV</button>
+                <button class="btn plain xs">&#8681; Download template</button>
+            </div>
+        </div>
+        <div class="modal-foot between">
+            <span class="xs sub">Limit 1,000 per condition</span>
+            <div class="row g8">
+                <button class="btn" data-close="bulkModal">Cancel</button>
+                <button class="btn primary" id="bulkAdd">Replace list</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====================================================== popup wording === -->
+
+<!-- ============================================================== delete === -->
+<div class="modal-bg hide" id="delModal">
+    <div class="modal" style="max-width:420px">
+        <div class="modal-head">
+            <h2 class="h-md">Delete this lock?</h2>
+            <button class="btn plain" data-close="delModal" aria-label="Close">&#10005;</button>
+        </div>
+        <div style="padding:16px">
+            <p class="sm sub">The content it covers goes back to being open to everyone, straight
+                away. Your passcodes and the customers who used them are not kept.</p>
+        </div>
+        <div class="modal-foot">
+            <button class="btn" data-close="delModal">Cancel</button>
+            <a class="btn danger" href="locks.html">Delete lock</a>
+        </div>
+    </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script src="assets/lock-form.js"></script>
+<script src="assets/lock-controls.js"></script>
+<script src="assets/lock-page.js"></script>
+</html>

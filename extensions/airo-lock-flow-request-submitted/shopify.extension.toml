@@ -1,0 +1,40 @@
+api_version = "2025-10"
+
+[[extensions]]
+name = "Airo Access Lock & Control request submitted"
+uid = "7da05a7e-6d0a-94be-9433-77ecd3dff663658ce281"
+type = "flow_trigger"
+handle = "airo-lock-request-submitted"
+description = "Fires when a customer submits a Request Credentials form on a locked resource."
+
+  [settings]
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "ruleId"
+    name = "Rule ID"
+    description = "Internal Airo Access Lock & Control rule id."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "lockId"
+    name = "Lock ID"
+    description = "Internal Airo Access Lock & Control lock id."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "resourceType"
+    name = "Resource type"
+    description = "Resource scope: product, collection, page, blog, shop, checkout."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "resourceHandle"
+    name = "Resource handle"
+    description = "Handle of the resource the request was submitted from."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "email"
+    name = "Email"
+    description = "Email the requester submitted."

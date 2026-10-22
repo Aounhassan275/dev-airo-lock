@@ -1,0 +1,52 @@
+api_version = "2025-10"
+
+[[extensions]]
+name = "Airo Access Lock & Control access denied"
+uid = "a18c7847-3fce-e183-9f4c-3fd32942b243cf2d8743"
+type = "flow_trigger"
+handle = "airo-lock-access-denied"
+description = "Fires when a customer fails an Airo Access Lock & Control access rule."
+
+  [settings]
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "ruleId"
+    name = "Rule ID"
+    description = "Internal Airo Access Lock & Control rule id."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "lockId"
+    name = "Lock ID"
+    description = "Internal Airo Access Lock & Control lock id."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "resourceType"
+    name = "Resource type"
+    description = "Resource scope: product, collection, page, blog, shop, checkout."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "resourceHandle"
+    name = "Resource handle"
+    description = "Handle of the resource that was evaluated."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "reason"
+    name = "Reason"
+    description = "Why the rule failed (e.g. invalid_input, requires_input)."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "email"
+    name = "Email"
+    description = "Customer email when known."
+
+    [[settings.fields]]
+    type = "single_line_text_field"
+    key = "country"
+    name = "Country"
+    description = "Detected ISO country code."

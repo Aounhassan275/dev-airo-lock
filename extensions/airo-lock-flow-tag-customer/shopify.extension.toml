@@ -6,7 +6,7 @@ uid = "9cc8cf2f-60b2-57ba-08c3-c264d82189868c9af0ad"
 type = "flow_action"
 handle = "airo-lock-tag-customer"
 description = "Applies every tag in the lock's required-tags conditions to a customer, granting access."
-runtime_url = "https://lock.airoapps.com/flow/action/tag-customer"
+runtime_url = "https://dev-lock.airoapps.com/flow/action/tag-customer"
 
   [settings]
 

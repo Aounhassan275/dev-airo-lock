@@ -92,7 +92,7 @@ Route::middleware(['verify.shopify', 'plan.gate', 'onboard'])->group(function ()
 
 // Shopify App Proxy routes.
 // Shopify rewrites https://<shop>.myshopify.com/apps/airo-lock/<path>
-// to https://lock.airoapps.com/proxy/<path> with a signed `signature` query param.
+// to https://dev-lock.airoapps.com/proxy/<path> with a signed `signature` query param.
 // The auth.proxy middleware (kyon147/laravel-shopify) verifies HMAC-SHA256
 // with constant-time comparison and authenticates the shop into the auth guard.
 Route::prefix('proxy')

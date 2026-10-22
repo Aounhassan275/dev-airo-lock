@@ -28,7 +28,7 @@ different places**, because Shopify gives you no single hook that covers the sto
 the cart and the checkout at once. Understanding those four places is most of
 understanding the app — see section 4.
 
-Production is <https://lock.airoapps.com>, Partner handle `acesslock-1`.
+Production is <https://dev-lock.airoapps.com>, Partner handle `acesslock-1`.
 
 ---
 
@@ -122,7 +122,7 @@ the same pattern in any new Shopify write.
 ### 4.3 The App Proxy (`app/Http/Controllers/ProxyController.php`)
 
 Shopify rewrites `https://<shop>.myshopify.com/apps/airo-lock/<path>` to
-`https://lock.airoapps.com/proxy/<path>` with a signed `signature` query parameter, which
+`https://dev-lock.airoapps.com/proxy/<path>` with a signed `signature` query parameter, which
 the package's `auth.proxy` middleware verifies with constant-time HMAC-SHA256 and uses to
 authenticate the shop.
 
@@ -566,11 +566,11 @@ The PHP feature tests worth knowing: `AccessRuleMultiLockTest`, `GlobalLockListT
 - **GitHub repo secret `DEPLOY_WEBHOOK_URL`** — the aaPanel deploy webhook including its
   access key.
 - **Shopify Partner account** — access to `acesslock-1` (client ID
-  `b1e2b0a22c97cc05cee44f76c16bd9c7`) for the API secret, scopes, App Proxy config, the
+  `fbfdecb30b5f0f83046ea52082889c72`) for the API secret, scopes, App Proxy config, the
   extension registrations and the App Store listing. You need this to run
   `shopify app deploy` at all.
 - **A Shopify Plus development store** — required to test checkout Function enforcement.
-- **aaPanel / VPS** — SSH and panel login for `lock.airoapps.com`, to read deploy logs,
+- **aaPanel / VPS** — SSH and panel login for `dev-lock.airoapps.com`, to read deploy logs,
   restart queue workers, run the scheduler and edit `.env`.
 - **The production `.env`** — the only place the Shopify API secret, database password,
   mail credentials and Redis password exist.

@@ -1,6 +1,6 @@
 name: Deploy to production
 
-# Auto-deploys lock.airoapps.com by hitting the aaPanel WebHook on every push
+# Auto-deploys dev-lock.airoapps.com by hitting the aaPanel WebHook on every push
 # to main. The webhook (on the VPS) runs the deploy script that pulls + builds.
 # The full webhook URL (incl. access_key) lives in the repo secret below so the
 # key is never committed: Settings -> Secrets and variables -> Actions.

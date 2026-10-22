@@ -6,7 +6,7 @@ uid = "8895e7f4-05bb-cfab-f0d7-201018b46e8685fbb805"
 type = "flow_action"
 handle = "airo-lock-revoke-access"
 description = "Removes the access-granting tag for the chosen Airo Access Lock & Control rule from a customer."
-runtime_url = "https://lock.airoapps.com/flow/action/revoke-access"
+runtime_url = "https://dev-lock.airoapps.com/flow/action/revoke-access"
 
   [settings]
 

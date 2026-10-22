@@ -6,7 +6,7 @@ uid = "39696695-7df9-cf83-1ce6-aaa2ab86cc2ddbeb85fb"
 type = "flow_action"
 handle = "airo-lock-grant-access"
 description = "Tags a customer so they pass the chosen Airo Access Lock & Control rule. Optionally time-limited."
-runtime_url = "https://lock.airoapps.com/flow/action/grant-access"
+runtime_url = "https://dev-lock.airoapps.com/flow/action/grant-access"
 
   [settings]
 

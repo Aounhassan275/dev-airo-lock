@@ -1,5 +1,5 @@
 
-const API_URL = 'https://lock.airoapps.com/api/storefront';
+const API_URL = 'https://dev-lock.airoapps.com/api/storefront';
 
 window.AccessControl = (function () {
     const INPUT_TYPES = ['singlePasscode', 'passcode', 'multiplePasscodes', 'passcodeFromList', 'specificEmail', 'emailContains', 'emailFromList', 'ageVerification'];

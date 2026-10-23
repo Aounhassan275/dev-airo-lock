@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Middleware;
+use App\Models\Lock;
 use App\Models\Onboarding;
 use Illuminate\Support\Facades\Auth;
 use Closure;
@@ -79,7 +80,18 @@ class Onboard
             return redirect()->route('onboarding', $request->query());
         }
 
-        // If status is 1 (completed), allow access to dashboard
+        // Completed, but the store still has no lock: every time the merchant
+        // opens the app (a full page load, not a click inside it) they start
+        // on the welcome screen again. Navigation within the app is left alone,
+        // so Skip still gets them in for this visit.
+        if ($request->isMethod('GET')
+            && ! $request->ajax()
+            && ! $request->header('X-Inertia')
+            && ! $request->routeIs(...self::ONBOARDING_ROUTES)
+            && ! Lock::where('shop_id', $user->id)->exists()) {
+            return redirect()->route('onboarding', $request->query());
+        }
+
         return $next($request);
     }
 }

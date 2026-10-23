@@ -26,7 +26,7 @@ class OnboardingController extends Controller
      * builder (AccessLockcontroller@create) is given: the picker catalogues,
      * the widget designs and the store's languages.
      *
-     * Onboarding is shown once, on install: a store that has finished it is
+     * Onboarding is for stores without a lock: once a store has one it is
      * sent to the dashboard. The one exception is the visit straight after
      * the first lock is saved, which the onboard middleware flashes so the
      * flow can show its result screen.
@@ -38,8 +38,11 @@ class OnboardingController extends Controller
     {
         $shop = Auth::user();
 
+        // A store with no lock yet always gets the flow; one that has locks
+        // only sees it once more, for the result screen after its first save.
         $done = Onboarding::where('user_id', $shop->id)->value('status') === 1;
-        if ($done && ! $request->session()->get('onboarding_result')) {
+        $hasLocks = Lock::where('shop_id', $shop->id)->exists();
+        if ($done && $hasLocks && ! $request->session()->get('onboarding_result')) {
             return redirect()->route('home', $request->query());
         }
 

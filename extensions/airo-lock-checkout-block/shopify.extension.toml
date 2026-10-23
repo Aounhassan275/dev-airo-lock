@@ -1,8 +1,8 @@
-# DECLARED 2025-10, BUILT WITH THE 2025-07 REACT PACKAGE. That mismatch is
+# DECLARED 2026-10, BUILT WITH THE 2025-07 REACT PACKAGE. That mismatch is
 # deliberate and forced:
 #
 #   - Shopify stopped accepting 2025-07 for checkout UI extensions; the
-#     platform now requires 2025-10 or newer, so a deploy is rejected outright.
+#     platform now requires 2026-10 or newer, so a deploy is rejected outright.
 #   - @shopify/ui-extensions-react has never shipped a release past the
 #     2025-07 tag (2025.7.4). Its only newer version, 2026.0.0, carries no
 #     API-version dist-tag and peer-pins an untagged @shopify/ui-extensions
@@ -14,9 +14,9 @@
 # attribute hooks, Banner/BlockStack/Text/TextField — is long-stable and
 # unchanged across these versions, so declaring the newer API version is safe
 # in practice. The real fix is migrating off the React wrapper to the
-# Preact/web-component authoring model that 2025-10+ expects; until then this
+# Preact/web-component authoring model that 2026-10+ expects; until then this
 # line is what keeps deploys working. See section 4.4 of DEVELOPER.md.
-api_version = "2025-10"
+api_version = "2026-10"
 
 [[extensions]]
 name = "Airo Access Lock & Control Checkout Block"

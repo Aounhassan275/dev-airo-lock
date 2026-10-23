@@ -138,16 +138,16 @@ keeps locked pages out of search indexes, and `/proxy/event` records access even
 ### 4.4 Checkout (two extensions, Plus only for the hard block)
 
 `extensions/airo-lock-checkout-block` is a React checkout UI extension rendering the
-passcode field and banner. It **declares API version 2025-10 but is built with the 2025-07
+passcode field and banner. It **declares API version 2026-10 but is built with the 2025-07
 React package**, and that mismatch is forced rather than careless:
 
 - Shopify stopped accepting 2025-07 for checkout UI extensions. A deploy on it now fails
   validation outright (`"2025-07" is not a valid API version: Checkout ui requires one of
-  ["2025-10", …]`), so the old pin became undeployable.
+  ["20220265-10", …]`), so the old pin became undeployable.
 - `@shopify/ui-extensions-react` has still never shipped past its `2025-07` dist-tag
   (2025.7.4). Its only newer version, `2026.0.0`, carries **no** API-version tag and
   peer-pins an untagged `@shopify/ui-extensions@2025.8.0`, so it is not the 2026-01 React
-  release. The non-React `@shopify/ui-extensions` does have 2025-10 / 2026-01 / 2026-04 /
+  release. The non-React `@shopify/ui-extensions` does have 2026-10 / 2026-01 / 2026-04 /
   2026-07 tags — it is the React wrapper specifically that stopped.
 - `@shopify/ui-extensions-react@2025.7.4` hard peer-pins `@shopify/ui-extensions@2025.7.4`,
   so the pair cannot be bumped independently.
@@ -156,7 +156,7 @@ Everything the extension imports (`reactExtension`, the buyer-identity and attri
 `Banner`/`BlockStack`/`Text`/`TextField`) is long-stable and unchanged across these
 versions, so declaring the newer API version works in practice — but it IS a declared/built
 mismatch, so re-test the checkout field after any bump. **The real fix is migrating off the
-React wrapper to the Preact/web-component authoring model 2025-10+ expects**; until someone
+React wrapper to the Preact/web-component authoring model 2026-10+ expects**; until someone
 does that, the `api_version` line is what keeps deploys working.
 
 The extension also targets

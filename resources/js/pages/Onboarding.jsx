@@ -28,7 +28,7 @@ import {
 } from '../components/onboarding/constants';
 import { findBySelectionId, itemListsByType, RESOURCE_TYPE_BY_CONTENT, selectionId, storeItem, CHECKOUT_ITEM } from '../lib/lockItems';
 import { inputFieldsFor, resolvePopupCopy } from '../lib/popupPreview';
-import { normalizeLocale, translate } from '../lib/widgetLanguages';
+import { normalizeLocale, preferredEditingLocale, translate } from '../lib/widgetLanguages';
 import { splitListValue } from '../lib/listValue';
 import { splitPairs } from '../lib/pairList';
 
@@ -238,7 +238,14 @@ export default function Onboarding(props) {
         if (!textWidgetId && textWidgets.length > 0) setTextWidgetId(String(textWidgets[0].id));
     }, [textWidgets, textWidgetId]);
 
-    const locale = normalizeLocale(primaryLocale) || 'en';
+    // The preview speaks the language the shown design is set to: a widget
+    // pinned to Urdu previews in Urdu, one that follows the storefront
+    // previews in the store's primary language. While a widget is being made,
+    // the language picked in its editor wins.
+    const previewLanguage = making
+        ? (draft?.language ? { mode: 'fixed', locale: draft.language, translations: {} } : null)
+        : (shownWidget?.configuration?.language || null);
+    const locale = preferredEditingLocale(previewLanguage, storeLocales, primaryLocale);
 
     const storefrontBase = (store?.url || '').replace(/\/+$/, '') || (auth?.user?.name ? `https://${auth.user.name}` : '');
 
@@ -614,6 +621,7 @@ export default function Onboarding(props) {
             off={embedStep && !embedOn}
             caption={!embedStep ? 'What shoppers see' : embedOn ? 'Your lock, running' : 'Your lock, once the embed is on'}
             locale={locale}
+            language={previewLanguage}
         />
     );
 

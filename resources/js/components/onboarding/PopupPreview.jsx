@@ -1,5 +1,5 @@
 import { previewFields, resolvePopupCopy } from '../../lib/popupPreview';
-import { translate } from '../../lib/widgetLanguages';
+import { applyLanguageForPreview, isRTLLocale, translate } from '../../lib/widgetLanguages';
 import Icon from './icons';
 
 export const DEFAULT_LOOK = { text: '#1a1a1a', card: '#ffffff', buttonBg: '#1a1a1a', buttonText: '#ffffff' };
@@ -49,8 +49,13 @@ export default function PopupPreview({
     off = false,
     caption = 'What shoppers see',
     locale = 'en',
+    language = null,
 }) {
+    // Register the widget's own wording overrides first, so the preview
+    // resolves them the way the storefront will (as LockPreview does).
+    applyLanguageForPreview({ ...(language || {}), mode: 'auto' });
     const t = (key) => translate(key, locale);
+    const rtl = isRTLLocale(locale);
     const copy = resolvePopupCopy({ text: popupText, description, design, translate: t });
     const fields = previewFields(groups);
     const look = draft || colors;
@@ -72,7 +77,7 @@ export default function PopupPreview({
                 </div>
                 <div className="veil" style={showPopup ? undefined : { background: 'transparent' }}>
                     {showPopup ? (
-                        <div className="lk" style={cardStyle}>
+                        <div className="lk" style={cardStyle} dir={rtl ? 'rtl' : undefined} lang={locale}>
                             <div className="lk-ico"><Icon name="lock" size={15} strokeWidth={1.8} /></div>
                             <div className="lk-t">{copy.title}</div>
                             <div className="lk-m">{copy.description}</div>

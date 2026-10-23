@@ -69,6 +69,7 @@ export const LOCALE_NAMES = {
     'zh-cn': 'Chinese Simplified (简体中文)',
     'zh-tw': 'Chinese Traditional (繁體中文)',
     ar: 'Arabic (العربية)',
+    ur: 'Urdu (اردو)',
     he: 'Hebrew (עברית)',
     hi: 'Hindi (हिन्दी)',
     th: 'Thai (ไทย)',

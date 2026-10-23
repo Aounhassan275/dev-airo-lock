@@ -43,9 +43,10 @@ export default function WidgetEditor({
     const [nameError, setNameError] = useState('');
 
     useEffect(() => {
-        onDraft(readDraft(colors, pad, rad, btnText));
+        // The language rides along so the preview speaks the one being picked.
+        onDraft({ ...readDraft(colors, pad, rad, btnText), language });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [colors, pad, rad, btnText]);
+    }, [colors, pad, rad, btnText, language]);
 
     const pickPalette = (p) => {
         setPalette(p.key);

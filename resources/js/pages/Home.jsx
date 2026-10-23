@@ -698,13 +698,6 @@ export default function Home({
                             )}
 
                             <div className="help-l">
-                                <Link href="/onboarding">
-                                    <svg width="15" height="15" {...svgProps}>
-                                        <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22z" />
-                                        <path d="M8 7h8M8 11h6" />
-                                    </svg>
-                                    Setup guide
-                                </Link>
                                 <button type="button" onClick={() => contact('I would like to request a feature: ')}>
                                     <svg width="15" height="15" {...svgProps}>
                                         <path d="M12 3l2.6 5.6 6.1.8-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.4l6.1-.8z" />

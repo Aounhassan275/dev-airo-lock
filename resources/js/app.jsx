@@ -21,12 +21,11 @@ createInertiaApp({
         createRoot(el).render(
             <AppProvider i18n={enTranslations}>
                 <NavMenu>
-                    {/* The app entry itself is the way to the dashboard; the four pages sit under it. */}
+                    {/* The app entry itself is the way to the dashboard; the three pages sit under it. Onboarding is not a page of its own: the onboard middleware shows it once, on install. */}
                     <a href="/" onClick={(event) => { event.preventDefault(); router.visit('/'); }} rel="home">Dashboard</a>
                     <a href="/locks" onClick={(event) => { event.preventDefault(); router.visit('/locks'); }}>Locks</a>
                     <a href="/widgetdashboard" onClick={(event) => { event.preventDefault(); router.visit('/widgetdashboard'); }}>Widgets</a>
                     <a href="/pricing" onClick={(event) => { event.preventDefault(); router.visit('/pricing'); }}>Subscriptions</a>
-                    <a href="/onboarding" onClick={(event) => { event.preventDefault(); router.visit('/onboarding'); }}>Onboarding</a>
                 </NavMenu>
                 <App {...props} />
                 {/* App-wide "app embed disabled" warning toast — shown on every page. */}

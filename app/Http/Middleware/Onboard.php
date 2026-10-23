@@ -64,7 +64,9 @@ class Onboard
                 $onboarding->markAsCompleted();
             }
 
-            return redirect()->route('onboarding', $request->query());
+            // Flashed so OnboardingController@index lets this one visit through
+            // to the result screen even though the store is now marked done.
+            return redirect()->route('onboarding', $request->query())->with('onboarding_result', true);
         }
 
         // If status is 0 (not completed), redirect to onboarding

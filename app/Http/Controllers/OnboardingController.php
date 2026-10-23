@@ -24,15 +24,24 @@ class OnboardingController extends Controller
      *
      * Setup builds a real first lock, so it needs exactly what the lock
      * builder (AccessLockcontroller@create) is given: the picker catalogues,
-     * the widget designs and the store's languages. A store that already
-     * finished onboarding can open this again — nothing here redirects.
+     * the widget designs and the store's languages.
+     *
+     * Onboarding is shown once, on install: a store that has finished it is
+     * sent to the dashboard. The one exception is the visit straight after
+     * the first lock is saved, which the onboard middleware flashes so the
+     * flow can show its result screen.
      *
      * NOTE (free period): plan / trial data is not sent; the app is free with
      * unlimited locks, and plan limits are enforced server-side on save anyway.
      */
-    public function index()
+    public function index(Request $request)
     {
         $shop = Auth::user();
+
+        $done = Onboarding::where('user_id', $shop->id)->value('status') === 1;
+        if ($done && ! $request->session()->get('onboarding_result')) {
+            return redirect()->route('home', $request->query());
+        }
 
         try {
             $shopLocales = app(ShopLocaleService::class)->get($shop);

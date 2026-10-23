@@ -48,7 +48,11 @@ class SyncPagesJob implements ShouldQueue
 
             if (!isset($response['body']['data']['pages'])) {
                 Log::error('Page sync failed: Invalid response', ['shop_id' => $shop->id, 'response' => $response]);
-                return;
+                $shop->forgetRevokedAccessToken($response);
+
+                // Throw rather than return: a silent return made a manual refresh
+                // report "Updated from Shopify" with nothing fetched.
+                throw new \RuntimeException('Shopify returned no pages data: '.json_encode($response['body']['errors'] ?? $response['errors'] ?? null));
             }
 
             $data = $response['body']['data']['pages'];

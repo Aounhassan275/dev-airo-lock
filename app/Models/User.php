@@ -168,4 +168,32 @@ class User extends Authenticatable implements IShopModel, FilamentUser
             || str_contains($planName, 'developer')
             || str_contains($planName, 'partner');
     }
+
+    /**
+     * Drop the stored access token when Shopify rejects it (HTTP 401).
+     *
+     * VerifyShopify logs a shop straight in while it has a token, and only
+     * runs the install / token exchange when the token is empty. A token
+     * that Shopify has revoked — e.g. a reinstall that arrived before the
+     * queued app/uninstalled job cleared the old one — would otherwise be
+     * used forever. Emptying it makes the next app load fetch a fresh one.
+     *
+     * @param  array|\ArrayAccess  $response  The result of $shop->api()->graph()/rest().
+     * @return bool Whether the token was dropped.
+     */
+    public function forgetRevokedAccessToken($response): bool
+    {
+        if ((int) ($response['status'] ?? 0) !== 401 || empty($this->password)) {
+            return false;
+        }
+
+        \Illuminate\Support\Facades\Log::warning('Shopify rejected the access token; cleared it so the next load re-authenticates', [
+            'shop_id' => $this->id,
+            'shop' => $this->name,
+        ]);
+
+        $this->forceFill(['password' => ''])->save();
+
+        return true;
+    }
 }

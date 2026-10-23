@@ -75,7 +75,11 @@ class SyncProductsJob implements ShouldQueue
             if (! isset($response['body']['data']['products'])) {
                 Log::error('Product sync failed: Invalid response', ['shop_id' => $shop->id, 'response' => $response]);
 
-                return;
+                $shop->forgetRevokedAccessToken($response);
+
+                // Throw rather than return: a silent return made a manual refresh
+                // report "Updated from Shopify" with nothing fetched.
+                throw new \RuntimeException('Shopify returned no products data: '.json_encode($response['body']['errors'] ?? $response['errors'] ?? null));
             }
 
             $data = $response['body']['data']['products'];

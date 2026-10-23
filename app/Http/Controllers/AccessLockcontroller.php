@@ -336,6 +336,13 @@ class AccessLockcontroller extends Controller
                 'error' => $e->getMessage(),
             ]);
 
+            // Shopify rejected the token and the job dropped it: reload the
+            // page in full, which takes the app through the token exchange
+            // and back here with a working token.
+            if (empty($shop->fresh()?->password)) {
+                return Inertia::location($request->headers->get('referer') ?: route('home'));
+            }
+
             return redirect()->back()->withErrors(['refresh' => 'Could not reach Shopify. Please try again.']);
         }
 

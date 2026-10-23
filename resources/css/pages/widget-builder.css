@@ -1,0 +1,56 @@
+/* The widget page (/widgets, /widgets?id=). Every selector is scoped to
+   .pg-widget-builder because every page's CSS is loaded on every page.
+   The shell — header row, numbered sections, sticky rail, save bar — is the
+   shared "one page" set in airo.css; this is only what a widget adds. */
+
+/* The palettes, laid out for a column this wide rather than for a modal. */
+.pg-widget-builder .palettes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 1320px) { .pg-widget-builder .palettes { grid-template-columns: minmax(0, 1fr); } }
+
+/* Who is relying on this design. A widget is shared, so editing one edits
+   every lock that picked it, and the page has to say so before you do. */
+.pg-widget-builder .uses-l2 {
+    display: flex; align-items: center; gap: 8px; font-size: 12.5px;
+    padding: 10px 0; border-bottom: 1px solid var(--p-border-soft);
+}
+.pg-widget-builder .uses-l2:first-child { padding-top: 0; }
+.pg-widget-builder .uses-l2:last-child { border-bottom: 0; padding-bottom: 0; }
+.pg-widget-builder .uses-l2 a { font-weight: 600; color: var(--p-text); text-decoration: none; }
+.pg-widget-builder .uses-l2 a:hover { text-decoration: underline; }
+
+/* The colours, each a swatch you can open. */
+.pg-widget-builder .wb-colours { display: flex; gap: 8px; flex-wrap: wrap; }
+.pg-widget-builder .wb-hex {
+    font-size: 11px; font-weight: 500; color: var(--p-text-sub);
+    font-variant-numeric: tabular-nums; letter-spacing: .02em;
+}
+
+/* Field messages. */
+.pg-widget-builder .wb-err { color: var(--p-critical-fg); }
+.pg-widget-builder .wb-warn { color: var(--p-warning-fg, #8a6116); }
+.pg-widget-builder .sec-hd .btn.plain { flex: none; }
+.pg-widget-builder .btn.plain.xs { font-size: 12px; }
+.pg-widget-builder .wb-css-t { margin-left: -6px; }
+.pg-widget-builder .wb-css {
+    min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+}
+
+/* The preview card takes the widget's own padding and radius; the content
+   inside it stays the size the mockup device draws. */
+.pg-widget-builder .lk { transition: background .15s, color .15s; }
+.pg-widget-builder .lk-f { color: inherit; }
+
+/* Which language the preview is drawn in. Only the preview — not the shopper. */
+.pg-widget-builder .wb-plang {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px; width: 100%; max-width: 236px;
+}
+.pg-widget-builder .wb-plang .select { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px; }
+
+/* The Kind options when a saved widget cannot change kind. */
+.pg-widget-builder .opt[disabled] { cursor: not-allowed; }
+.pg-widget-builder .opt.on[disabled] { cursor: default; }
+
+@media (max-width: 760px) {
+    .pg-widget-builder .fields2 { grid-template-columns: minmax(0, 1fr); }
+    .pg-widget-builder .opts2 { grid-template-columns: minmax(0, 1fr); }
+}

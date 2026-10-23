@@ -421,7 +421,7 @@ class AccessLockcontroller extends Controller
         // Update Global Metafield
         $this->updateGlobalMetafield($shop);
 
-        return to_route('home')->with('success', 'Price Hide Rule Created');
+        return to_route('locks.index')->with('success', 'Price Hide Rule Created');
     }
 
     private function createPriceRule($shop, $lock, $product, $validated)
@@ -672,7 +672,7 @@ class AccessLockcontroller extends Controller
                 app(\App\Services\MailService::class)->lockCreated($shop, $lock);
             }
 
-            return to_route('home')->with('success', 'Lock saved successfully');
+            return to_route('locks.index')->with('success', 'Lock saved successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Let validation exceptions bubble up normally (Inertia handles them)
             throw $e;
@@ -1727,7 +1727,7 @@ class AccessLockcontroller extends Controller
         // Update Global Metafield to reflect changes
         $this->updateGlobalMetafield($shop);
 
-        return to_route('home')->with('success', 'Lock updated successfully');
+        return to_route('locks.index')->with('success', 'Lock updated successfully');
     }
 
     public function destroy(Lock $lock)
@@ -1787,10 +1787,10 @@ class AccessLockcontroller extends Controller
 
             app(\App\Services\MailService::class)->lockDeleted($shop, $lockName, $itemCount);
 
-            return to_route('home')->with('success', 'Lock deleted successfully');
+            return to_route('locks.index')->with('success', 'Lock deleted successfully');
         } catch (\Exception $e) {
             Log::error('Failed to delete lock', ['error' => $e->getMessage(), 'lock_id' => $lock->id]);
-            return to_route('home')->with('error', 'Failed to delete lock');
+            return to_route('locks.index')->with('error', 'Failed to delete lock');
         }
     }
 

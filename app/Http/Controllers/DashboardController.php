@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AccessLog;
+use App\Models\AccessRule;
 use App\Models\Lock;
 use App\Models\User;
 use App\Services\ThemeExtensionService;
@@ -14,9 +16,75 @@ use Inertia\Inertia;
 class DashboardController extends Controller
 {
     /**
-     * Display the dashboard with locks, stats, and plan information.
+     * The app's home: what the locks did over the last 30 days, the state of
+     * the theme app embed, and the plan. Every figure is read from access_logs
+     * (written by FlowController::event for each granted/denied decision).
      */
     public function index()
+    {
+        $shop = Auth::user()->load('plan');
+
+        $locks = Lock::where('shop_id', $shop->id)->withCount('accessRules')->get();
+        $ruleIds = AccessRule::whereIn('lock_id', $locks->pluck('id'))->pluck('id');
+
+        $logs30 = AccessLog::whereIn('access_rule_id', $ruleIds)
+            ->where('created_at', '>=', now()->subDays(30));
+        $stopped = (clone $logs30)->count();
+        $granted = (clone $logs30)->where('granted', true)->count();
+
+        // Fourteen days, oldest first: everyone a lock stopped, and how many
+        // of them got through.
+        $daily = AccessLog::whereIn('access_rule_id', $ruleIds)
+            ->where('created_at', '>=', now()->subDays(13)->startOfDay())
+            ->selectRaw('DATE(created_at) as d, COUNT(*) as total, SUM(CASE WHEN granted THEN 1 ELSE 0 END) as granted_count')
+            ->groupBy('d')
+            ->get()
+            ->keyBy('d');
+        $series = [];
+        for ($i = 13; $i >= 0; $i--) {
+            $day = now()->subDays($i)->toDateString();
+            $row = $daily->get($day);
+            $series[] = [
+                'date' => $day,
+                'total' => (int) ($row->total ?? 0),
+                'granted' => (int) ($row->granted_count ?? 0),
+            ];
+        }
+
+        $extension = app(ThemeExtensionService::class)->status($shop);
+        $plan = $shop->plan;
+        $unlimited = $shop->hasUnlimitedLocks();
+        $maxLocks = $shop->getMaxLocks();
+
+        return Inertia::render('Home', [
+            'shopName' => $shop->name,
+            'stats' => [
+                'stopped' => $stopped,
+                'granted' => $granted,
+                'itemsSecured' => (int) $locks->sum('access_rules_count'),
+                'locks' => $locks->count(),
+                'activeLocks' => $locks->where('status', true)->count(),
+            ],
+            'series' => $series,
+            'extensionEnabled' => $extension['enabled'],
+            'extensionDeepLink' => $extension['deepLink'],
+            'extensionReason' => $extension['reason'] ?? null,
+            'plan' => config('shopify-app.billing_enabled') ? [
+                'name' => $plan->name
+                    ?? (($shop->isFreemium() || $shop->isGrandfathered()) ? 'Free access' : 'No plan'),
+                'maxLocks' => $unlimited ? 0 : $maxLocks,
+                'hasUnlimitedLocks' => $unlimited,
+                'currentLocks' => $locks->count(),
+                'isTrial' => $shop->isInTrial(),
+                'daysRemaining' => $shop->getTrialDaysRemaining(),
+            ] : null,
+        ]);
+    }
+
+    /**
+     * The lock list, with stats and plan information.
+     */
+    public function locks()
     {
         $shop = Auth::user()->load('plan');
 
@@ -28,6 +96,27 @@ class DashboardController extends Controller
         // What each lock protects (products, pages, the whole store …), so the
         // list can say that instead of a meaningless "Standard".
         Lock::attachResourceTypes($locks);
+
+        // Each lock's last 30 days from access_logs: how many decisions it
+        // made (visitors it stopped) and how many of them let the visitor
+        // through. Counted the same way as the dashboard (one row per
+        // granted/denied decision), so the two pages agree.
+        $activity = AccessLog::query()
+            ->join('access_rules', 'access_rules.id', '=', 'access_logs.access_rule_id')
+            ->whereIn('access_rules.lock_id', $locks->pluck('id'))
+            ->where('access_logs.created_at', '>=', now()->subDays(30))
+            ->groupBy('access_rules.lock_id')
+            ->selectRaw('access_rules.lock_id as lock_id, COUNT(*) as seen, SUM(CASE WHEN access_logs.granted THEN 1 ELSE 0 END) as unlocked')
+            ->get()
+            ->keyBy('lock_id');
+
+        $locks->each(function ($lock) use ($activity) {
+            $row = $activity->get($lock->id);
+            $lock->setAttribute('activity_30d', [
+                'seen' => (int) ($row->seen ?? 0),
+                'unlocked' => (int) ($row->unlocked ?? 0),
+            ]);
+        });
 
         $storesCount = User::count();
 

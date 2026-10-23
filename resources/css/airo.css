@@ -1,0 +1,1078 @@
+/* Airo design system — ported from design-mockup-ink/assets/app.css.
+   Everything a page draws inside <div className="airo"> uses these pieces.
+   The mockup's fake Shopify admin shell (sidebar, frame, boot screen) is left
+   out: the real app is embedded and Shopify draws that chrome itself. */
+/* ---------------------------------------------------------------------------
+   Airo Access Lock — mockup of the CURRENT design
+
+   This folder documents the app as it is today, not a proposal. Everything
+   here is traced from the real screens:
+       resources/js/Pages/Dashboard.jsx
+       resources/js/Pages/locks/LockCreationFlow.jsx
+       resources/js/Pages/LockConfigurePage.jsx
+       resources/js/Pages/widget/Widgetsdashboard.jsx
+       resources/js/Pages/Plans.jsx
+       resources/js/Pages/Onboarding.jsx
+
+   Two visual systems are in play in the real app and both are reproduced:
+   Polaris components (Page, Card, IndexTable, Badge, Button) and a set of
+   hand-styled violet blocks written as inline styles on top of them.
+--------------------------------------------------------------------------- */
+
+:root {
+    /* Polaris surfaces */
+    --p-bg: #f1f1f1;
+    --p-surface: #ffffff;
+    --p-border: #e3e3e3;
+    --p-border-soft: #ebebeb;
+    --p-text: #303030;
+    --p-text-sub: #616161;
+    --p-text-disabled: #8a8a8a;
+    --p-card-shadow: 0 1px 0 rgba(26, 26, 26, .07);
+
+    /* Polaris tones */
+    --p-success-bg: #cdfee1; --p-success-fg: #0c5132;
+    --p-attention-bg: #ffd79d; --p-attention-fg: #5e4200;
+    --p-warning-bg: #ffeccc; --p-warning-fg: #5e4200;
+    --p-critical-bg: #fee9e6; --p-critical-fg: #8e1f0b;
+    --p-info-bg: #d6f0fd; --p-info-fg: #00527c;
+
+    /* Accent: black. Emphasis comes from weight and contrast rather than hue,
+       which is how the Shopify admin and the apps that sit well inside it
+       behave. The ramp stays so every tint moves together. */
+    --v-50: #f6f6f7;
+    --v-100: #ececee;
+    --v-200: #d6d6da;
+    --v-400: #8a8a8a;
+    --v-500: #1a1a1a;
+    --v-600: #000000;
+    --v-700: #303030;
+    --v-800: #303030;
+
+    --accent: var(--v-500);
+    --accent-strong: var(--v-600);
+    --accent-deep: var(--v-700);
+    --accent-soft: var(--v-100);
+    --accent-ring: rgba(26, 26, 26, .18);
+
+    /* Buttons are the exception, and they are deliberately not on the ramp.
+       A violet primary button next to violet tiles, violet ticks and violet
+       meters is one violet among many; a black one is the only black on the
+       screen, so it is still the heaviest thing on it. */
+    --btn-bg: #1a1a1a;
+    --btn-bg-strong: #000000;
+    --btn-edge: #303030;
+
+    /* The three places colour is still allowed to carry meaning. */
+    --link: var(--v-800);   /* anything clickable that is not a button */
+    --ok: #0c5132;          /* confirmations and feature ticks */
+    --pro: #8a6116;         /* plan gating */
+    --pro-bg: #fff1c2;
+
+    /* One hue per thing a lock can protect, straight from the app's own
+       resources/js/lib/resourceTypes.js. These are not decoration: the type
+       is the single most-repeated fact on these screens — eight tiles on
+       step 1, a pill per rule on every row of the lock list — and it is the
+       one thing a colour can say faster than a word. */
+    --t-product-bg: #ede9fe; --t-product-fg: #5b21b6;
+    --t-collection-bg: #dbeafe; --t-collection-fg: #1e40af;
+    --t-page-bg: #dcfce7; --t-page-fg: #166534;
+    --t-blog-bg: #fef3c7; --t-blog-fg: #92400e;
+    --t-theme-bg: #e0f2fe; --t-theme-fg: #075985;
+    --t-checkout-bg: #ffe4e6; --t-checkout-fg: #9f1239;
+    --t-shop-bg: #fee2e2; --t-shop-fg: #991b1b;
+
+    --g-400: #8a8a8a;
+    --g-500: #616161;
+    --g-900: #1a1a1a;
+    --g-200: #e3e3e3;
+
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif;
+}
+
+.airo, .airo * { box-sizing: border-box; }
+
+.airo {
+    margin: 0; background: var(--p-bg); color: var(--p-text);
+    font-family: var(--font); font-size: 13px; line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+}
+
+.airo h1, .airo h2, .airo h3, .airo h4 { margin: 0; font-weight: 650; }
+.airo p { margin: 0; }
+.airo a { color: var(--link); }
+
+/* utilities ---------------------------------------------------------------- */
+.row { display: flex; align-items: center; }
+.between { display: flex; align-items: center; justify-content: space-between; }
+.stack { display: flex; flex-direction: column; }
+.wrap { flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.g4 { gap: 4px; } .g8 { gap: 8px; } .g12 { gap: 12px; } .g16 { gap: 16px; } .g20 { gap: 20px; }
+.mt4 { margin-top: 4px; } .mt8 { margin-top: 8px; } .mt12 { margin-top: 12px; }
+.mt16 { margin-top: 16px; } .mt20 { margin-top: 20px; }
+.sub { color: var(--p-text-sub); }
+.xs { font-size: 12px; } .sm { font-size: 12.5px; }
+.strong { font-weight: 600; }
+.center { text-align: center; }
+.hide { display: none !important; }
+.divider { height: 1px; background: var(--p-border-soft); }
+
+/* Which page of a shelf you are on, and a way to the others. Shared: the
+   dashboard's app shelf and the plans page's reviews both page this way. */
+.dots { display: flex; justify-content: center; gap: 7px; margin-top: 13px; }
+.dot {
+    width: 7px; height: 7px; padding: 0; border: 0; border-radius: 50%;
+    background: #d7d7dc; cursor: pointer; transition: background .12s, width .12s;
+}
+.dot:hover { background: #b5b5b5; }
+.dot.on { background: var(--accent); width: 18px; border-radius: 20px; }
+
+/* --------------------------------------------------------- polaris page -- */
+.page { max-width: 998px; margin: 0 auto; padding: 20px 16px 60px; }
+.page.full { max-width: 1200px; }
+
+.page-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.page-title { font-size: 20px; font-weight: 650; letter-spacing: -.01em; }
+.page-sub { font-size: 13px; color: var(--p-text-sub); margin-top: 2px; }
+
+/* --------------------------------------------------------- polaris card -- */
+.card {
+    background: var(--p-surface); border-radius: 12px; box-shadow: var(--p-card-shadow);
+    border: 1px solid var(--p-border-soft);
+}
+.card-p { padding: 16px; }
+.card-sec { padding: 16px; border-bottom: 1px solid var(--p-border-soft); }
+.card-sec:last-child { border-bottom: 0; }
+.h-md { font-size: 14px; font-weight: 650; }
+.h-sm { font-size: 13px; font-weight: 650; }
+
+/* ------------------------------------------------------ polaris button --- */
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, .17);
+    background: #fff; color: var(--p-text); font: inherit; font-size: 13px; font-weight: 550;
+    cursor: pointer; box-shadow: 0 -1px 0 0 #b5b5b5 inset, 0 1px 0 0 rgba(0, 0, 0, .05);
+    text-decoration: none; white-space: nowrap;
+}
+.btn:hover { background: #f7f7f7; }
+.btn.primary {
+    background: var(--btn-bg); border-color: var(--btn-bg-strong); color: #fff;
+    box-shadow: 0 -1px 0 0 var(--btn-edge) inset, 0 1px 0 0 rgba(0, 0, 0, .12);
+}
+.btn.primary:hover { background: var(--btn-bg-strong); }
+.btn.plain { border: 0; background: transparent; box-shadow: none; color: var(--link); padding: 4px 6px; }
+.btn.plain:hover { background: #f1f1f1; }
+.btn.disc:after { content: '\25BE'; margin-left: auto; opacity: .6; }
+.btn.full { width: 100%; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn.icon { padding: 6px; width: 30px; }
+
+/* ------------------------------------------------------- polaris badge --- */
+.badge {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+    border-radius: 8px; font-size: 12px; font-weight: 550;
+    background: #e3e3e3; color: #303030;
+}
+.badge.success { background: var(--p-success-bg); color: var(--p-success-fg); }
+.badge.attention { background: var(--p-attention-bg); color: var(--p-attention-fg); }
+.badge.warning { background: var(--p-warning-bg); color: var(--p-warning-fg); }
+.badge.critical { background: var(--p-critical-bg); color: var(--p-critical-fg); }
+.badge.info { background: var(--p-info-bg); color: var(--p-info-fg); }
+.badge.pro { background: var(--pro-bg); color: var(--pro); }
+
+/* Resource-type pills, monochrome. The old palette gave each of the seven
+   types its own hue; side by side in one table cell they read as decoration
+   rather than as data. The label names the type, so the colour was carrying
+   nothing the words were not. */
+.pill {
+    display: inline-block; padding: 1px 9px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; background: #f1f1f1; color: #4a4a4a;
+    border: 1px solid transparent;
+}
+.pill.product { background: var(--t-product-bg); color: var(--t-product-fg); }
+.pill.variant { background: var(--t-product-bg); color: var(--t-product-fg); }
+.pill.collection { background: var(--t-collection-bg); color: var(--t-collection-fg); }
+.pill.page { background: var(--t-page-bg); color: var(--t-page-fg); }
+.pill.blog { background: var(--t-blog-bg); color: var(--t-blog-fg); }
+.pill.theme { background: var(--t-theme-bg); color: var(--t-theme-fg); }
+.pill.checkout { background: var(--t-checkout-bg); color: var(--t-checkout-fg); }
+.pill.shop { background: var(--t-shop-bg); color: var(--t-shop-fg); }
+.pill.neutral { background: transparent; color: #8a8a8a; }
+
+/* ------------------------------------------------------ polaris fields --- */
+.field { display: flex; flex-direction: column; gap: 4px; }
+.label { font-size: 13px; color: var(--p-text); }
+/* The mark on a field the form will not continue without. It is the critical
+   colour but not bold: it is saying "needed", not "wrong". */
+.req { color: var(--p-critical-fg); font-weight: 500; margin-left: 1px; }
+.input, .select, .textarea {
+    width: 100%; padding: 6px 10px; font: inherit; font-size: 13px; color: var(--p-text);
+    background: #fff; border: 1px solid #8a8a8a; border-radius: 8px;
+}
+.input:focus, .select:focus, .textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+.textarea { min-height: 62px; resize: vertical; font-family: var(--font); }
+.help { font-size: 12px; color: var(--p-text-sub); }
+.chk { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+.chk input { margin: 2px 0 0; }
+
+/* ------------------------------------------------- polaris index table --- */
+.filters { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px;
+    border-bottom: 1px solid var(--p-border-soft); }
+.tabs { display: flex; gap: 2px; }
+.tab { padding: 5px 10px; border-radius: 8px; border: 0; background: transparent;
+    font: inherit; font-size: 13px; font-weight: 550; color: var(--p-text-sub); cursor: pointer; }
+.tab:hover { background: #f1f1f1; }
+.tab.on { background: #f1f1f1; color: var(--p-text); }
+.searchbar { display: flex; align-items: center; gap: 7px; padding: 5px 10px;
+    border: 1px solid #8a8a8a; border-radius: 8px; color: var(--p-text-disabled); font-size: 13px; }
+/* The tabs take the free space, so search and sort sit at the right end. */
+.filters .tabs { margin-right: auto; }
+.filters .searchbar { flex: 0 1 268px; min-width: 0; }
+
+.idx { width: 100%; border-collapse: collapse; }
+.idx th {
+    text-align: left; font-size: 12px; font-weight: 550; color: var(--p-text-sub);
+    padding: 8px 12px; background: #fafafa; border-bottom: 1px solid var(--p-border-soft);
+    white-space: nowrap;
+}
+.idx td { padding: 10px 12px; border-bottom: 1px solid var(--p-border-soft); vertical-align: middle; }
+.idx tr:last-child td { border-bottom: 0; }
+.idx tr:hover td { background: #fafafa; }
+.idx .end { text-align: right; }
+
+/* The small violet item counter in the Items column */
+.count-chip {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px;
+    padding: 0 6px; border-radius: 6px; background: #1a1a1a; color: #fff;
+    font-size: 11px; font-weight: 650;
+}
+
+/* KnobToggle, the app's own switch */
+.knob { width: 36px; height: 20px; border-radius: 999px; background: var(--accent); border: 0;
+    position: relative; cursor: pointer; flex: none; }
+.knob:after { content: ''; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: #fff; transition: all .15s; }
+.knob.off { background: #b5b5b5; }
+.knob.off:after { right: calc(100% - 18px); }
+
+/* ------------------------------------------------- the violet additions -- */
+/* Hand-styled blocks that sit on top of Polaris in the real app. */
+.v-banner {
+    border-radius: 12px; padding: 18px 20px; position: relative; overflow: hidden;
+    background: #1a1a1a; border: 1px solid #000; color: #fff;
+}
+.v-banner .blob { display: none; }
+.v-tile {
+    width: 38px; height: 38px; border-radius: 10px; flex: none;
+    background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .14);
+    display: grid; place-items: center; color: #fff;
+}
+
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.stat {
+    border-radius: 12px; background: #fff; border: 1px solid var(--g-200);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, .04); padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px; transition: all .25s ease;
+}
+.stat:hover { border-color: #b5b5b5; box-shadow: 0 2px 10px rgba(0, 0, 0, .07); }
+.stat-ico { width: 38px; height: 38px; border-radius: 9px; background: #f1f1f1;
+    border: 1px solid #e3e3e3; display: grid; place-items: center; flex: none; color: #1a1a1a; }
+.stat-l { font-size: 11px; color: var(--g-500); font-weight: 550; display: block; }
+.stat-v { font-size: 24px; font-weight: 700; color: var(--g-900); display: block; line-height: 28px; }
+.stat-s { font-size: 11px; color: var(--g-400); font-weight: 500; display: block;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* -------------------------------------------------------- empty state ---- */
+.empty { padding: 44px 20px; text-align: center; }
+.empty img { width: 180px; opacity: .9; }
+
+/* ------------------------------------------------------------ modal ------ */
+.modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 60;
+    display: grid; place-items: center; padding: 20px; }
+/* On a phone a modal takes the screen rather than floating in the middle of
+   it, and its own body does the scrolling. */
+@media (max-width: 600px) {
+    .modal-bg { padding: 8px; }
+    .modal { max-height: calc(100vh - 16px); max-width: none; }
+    .modal .work-body { padding-left: 14px; padding-right: 14px; }
+    .modal .pick-list { max-height: none; flex: 1; min-height: 0; }
+    .modal-head, .modal-foot { padding-left: 14px; padding-right: 14px; }
+    .modal-foot { flex-wrap: wrap; gap: 8px; }
+}
+.modal {
+    width: 100%; max-width: 620px; background: #fff; border-radius: 12px;
+    box-shadow: 0 26px 80px rgba(0, 0, 0, .3);
+    /* Bounded to the window, so the header and the actions are never clipped. */
+    max-height: calc(100vh - 40px); display: flex; flex-direction: column; overflow: hidden;
+}
+/* A modal built from the split needs the same height chain the page uses, or
+   its body grows past the frame instead of scrolling inside it. */
+.modal > .split { flex: 1; min-height: 0; }
+.modal .work { min-height: 0; }
+.modal .work-head, .modal .work-foot { flex: none; }
+.modal .work-body { min-height: 0; overflow: hidden; align-items: stretch; }
+.modal .work-opts { min-height: 0; overflow-y: auto; }
+/* overflow-y: auto makes overflow-x compute to auto as well, and the stage
+   came out one pixel wider than its box, so the preview carried a horizontal
+   scrollbar it had no use for. The device inside it is a fixed width; there
+   is never anything to scroll sideways to. */
+.modal .stage { align-self: flex-start; max-height: 100%; overflow-y: auto; overflow-x: hidden; }
+.modal-head { padding: 14px 16px; border-bottom: 1px solid var(--p-border-soft);
+    display: flex; align-items: center; justify-content: space-between; }
+.modal-foot { padding: 14px 16px; border-top: 1px solid var(--p-border-soft);
+    display: flex; justify-content: flex-end; gap: 8px; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .grid2 { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 860px) { .sb { display: none; } }
+
+/* Icon tiles now hold SVGs rather than emoji, so they centre on the box
+   instead of on a text baseline. */
+.rail-ico svg, .stat-ico svg, .v-tile svg, .help-ico svg { display: block; }
+.btn.icon svg { display: block; }
+
+/* ===========================================================================
+   DESIGN LANGUAGE
+   Lifted out of the setup screen so every page uses the same pieces rather
+   than a copy of them. Three things define it:
+
+     .panel   a black surface that carries context — steps, a summary, state.
+              Black is structure here, not a button colour.
+     .stage   a dark mount for anything the shopper sees. A white popup on a
+              white card has no edge; on black it reads as a screen.
+     .opt     a pickable row. The whole row is the target and the chosen one
+              carries a black left edge.
+
+   One accent, the app's violet, and it only marks progress or the current
+   thing.
+   =========================================================================== */
+:root {
+    --ink-0: #0e0e0e;
+    --ink-1: #1a1a1a;
+    --rail-line: #272727;
+    --rail-text: #9a9a9a;
+}
+
+/* ------------------------------------------------------------- panel ----- */
+.panel {
+    background: var(--ink-0); color: #fff; padding: 22px 20px;
+    display: flex; flex-direction: column; flex: none;
+}
+.panel.w { width: 296px; }
+.panel-eyebrow {
+    font-size: 10px; font-weight: 700; letter-spacing: .18em;
+    color: var(--accent); text-transform: uppercase;
+}
+.panel h2 { font-size: 17px; font-weight: 650; margin-top: 6px; letter-spacing: -.01em; }
+.panel-note { font-size: 12px; color: var(--rail-text); margin-top: 4px; line-height: 1.45; }
+.panel-sep { height: 1px; background: var(--rail-line); margin: 18px 0; }
+.panel a { color: #fff; }
+
+/* A labelled list on the panel: key above, value below, a violet dot when set. */
+.sum-head {
+    font-size: 10px; font-weight: 700; letter-spacing: .14em; color: #6e6e6e;
+    text-transform: uppercase; margin-bottom: 10px;
+}
+.sum-row { display: flex; gap: 10px; padding: 7px 0; align-items: flex-start; }
+.sum-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rail-line);
+           flex: none; margin-top: 6px; }
+.sum-row.set .sum-dot { background: var(--accent); }
+.sum-k { font-size: 11px; color: #6e6e6e; display: block; }
+.sum-v { font-size: 12.5px; color: #5a5a5a; }
+.sum-row.set .sum-v { color: #fff; }
+
+.panel-bar { height: 3px; border-radius: 2px; background: var(--rail-line); overflow: hidden; }
+.panel-bar > i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+
+.panel .btn { background: #1f1f1f; border-color: #333; color: #fff; box-shadow: none; }
+.panel .btn:hover { background: #2a2a2a; }
+.panel .btn.primary { background: #fff; border-color: #fff; color: #1a1a1a; }
+
+/* ------------------------------------------------------------- split ----- */
+/* A black panel beside a white working area, in one bordered card. */
+.split {
+    display: flex; align-items: stretch; overflow: hidden;
+    border: 1px solid var(--p-border); border-radius: 16px; background: #fff;
+    box-shadow: 0 1px 2px rgba(26, 26, 26, .04), 0 12px 32px -20px rgba(26, 26, 26, .45);
+}
+.work { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.work-head { padding: 24px 28px 0; }
+.work-h { font-size: 21px; font-weight: 650; letter-spacing: -.02em; }
+.work-body { padding: 18px 28px 0; display: flex; gap: 26px; align-items: flex-start; flex: 1; }
+.work-opts { flex: 1; min-width: 0; }
+/* Room for the focus ring: a scrolling column clips on all four edges, and
+   the ring sits outside the control's border box. The negative margin puts
+   the content back exactly where it was. */
+.work-opts { padding: 3px 4px; margin: -3px -4px; }
+.work-foot {
+    margin-top: 22px; padding: 14px 28px; border-top: 1px solid var(--p-border-soft);
+    display: flex; align-items: center; justify-content: space-between; background: #fafafa;
+}
+
+/* ------------------------------------------------------------- stage ----- */
+/* The preview sits on a light stage, tinted just enough to separate it from
+   the card it stands in. The device's own shadow does the lifting that a dark
+   surround used to. */
+.stage {
+    background: linear-gradient(170deg, #f4f4f5, #fbfbfc 62%);
+    border: 1px solid var(--p-border-soft);
+    border-radius: 12px; padding: 20px 18px 16px;
+    display: flex; flex-direction: column; align-items: center; flex: none;
+}
+.stage.w { width: 318px; }
+.stage-cap {
+    font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--p-text-disabled); margin-top: 14px;
+}
+.device {
+    width: 236px; border: 8px solid #e3e3e3; border-radius: 22px; background: #fff;
+    overflow: hidden; position: relative; height: 356px;
+    box-shadow: 0 16px 42px -26px rgba(26, 26, 26, .55);
+}
+.device.short { height: 250px; }
+.sk { padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; }
+.sk i { display: block; height: 8px; border-radius: 4px; background: #ededf1; }
+.sk .gap { height: 12px; background: transparent; }
+
+/* The storefront lock is always a centred card over a dimmed page — that is
+   hardcoded in the theme extension, so there is no position choice to offer. */
+.veil { position: absolute; inset: 0; background: rgba(0, 0, 0, .6);
+        display: grid; place-items: center; padding: 14px; }
+.lk { width: 100%; border-radius: 10px; padding: 14px 13px; text-align: center;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .35); }
+.lk-ico { display: flex; justify-content: center; }
+.lk-t { font-size: 12px; font-weight: 700; margin-top: 6px; }
+.lk-m { font-size: 10px; opacity: .78; margin-top: 3px; line-height: 1.35; }
+.lk-l { font-size: 9px; text-align: left; margin-top: 7px; opacity: .7; }
+.lk-f { margin-top: 3px; padding: 5px 8px; border-radius: 5px; font-size: 9.5px;
+        border: 1px solid rgba(128, 128, 128, .3); opacity: .55; text-align: left; }
+.lk-b { margin-top: 8px; padding: 6px; border-radius: 5px; font-size: 10px; font-weight: 700; }
+
+/* --------------------------------------------------------------- opt ----- */
+.opt {
+    display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left;
+    padding: 10px 13px; border: 1px solid var(--p-border); border-radius: 10px;
+    background: #fff; font: inherit; cursor: pointer; margin-bottom: 7px;
+    transition: border-color .12s, box-shadow .12s;
+}
+.opt:hover { border-color: #b5b5b5; }
+.opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.opt.off { opacity: .5; cursor: not-allowed; }
+.opt-mark { width: 16px; height: 16px; border-radius: 50%; flex: none; margin-top: 2px;
+            border: 1.5px solid #b5b5b5; position: relative; }
+.opt.on .opt-mark { border-color: var(--accent); }
+.opt.on .opt-mark:after { content: ''; position: absolute; inset: 3px; border-radius: 50%;
+                          background: var(--accent); }
+.opt-t { font-size: 13px; font-weight: 550; }
+.opt-d { font-size: 12px; color: var(--p-text-sub); display: block; margin-top: 2px; }
+
+/* --------------------------------------------------------------- tag ----- */
+.tag {
+    font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: 1px 6px; border-radius: 4px; background: #f1f1f1; color: #616161;
+    margin-left: 6px; vertical-align: 1px; white-space: nowrap;
+}
+.tag.pro { background: #fff1c2; color: #8a6116; }
+.tag.form { background: var(--p-info-bg); color: var(--p-info-fg); }
+.tag.text { background: var(--p-success-bg); color: var(--p-success-fg); }
+.tag.live { background: var(--p-success-bg); color: var(--p-success-fg); }
+.tag.idle { background: #e3e3e3; color: #616161; }
+/* The thing you are on, in the hue that means that everywhere else. */
+.tag.now { background: var(--v-100); color: var(--v-800); }
+
+/* A numbered marker, used for steps on the panel and sections in a form. */
+.num {
+    width: 24px; height: 24px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-size: 11.5px; font-weight: 700;
+    background: var(--ink-1); color: #fff;
+}
+.num.quiet { background: transparent; border: 1.5px solid var(--rail-line); color: var(--rail-text); }
+.num.now { background: var(--accent); color: #fff; }
+.num.done { background: #fff; color: #1a1a1a; }
+
+.sec-l { font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase;
+         color: var(--p-text-sub); }
+
+/* A notice box. Named .notice, not .info: the stat tiles use good / warn /
+   info / brand as colour modifiers, and a bare .info here padded one of them
+   out of the middle of its own tile. */
+.notice {
+    display: flex; gap: 9px; padding: 11px 13px; border-radius: 10px;
+    background: #f7f7f7; border: 1px solid var(--p-border); color: var(--p-text-sub);
+    font-size: 12.5px;
+}
+
+@media (max-width: 1180px) { .work-body { flex-direction: column; } .stage.w { width: 100%; } }
+@media (max-width: 900px) { .split { flex-direction: column; } .panel.w { width: 100%; } }
+
+
+/* ----------------------------------------------------- the lock form ----- */
+/* Setup and the lock builder ask the same questions, so they are built from
+   the same controls: choice cards for what a lock covers, radio cards for what
+   locking does, a row per condition with its form in a modal, and a segmented
+   AND / OR over the top. Defined here because two screens use them. */
+
+/* What locking does. Radios rather than a select: the consequence is the
+   decision, so every option shows its own. */
+.acts { display: flex; flex-direction: column; gap: 7px; margin-top: 5px; }
+/* Three short options across a wide column instead of down a narrow one. It
+   folds to two, then to one, on its own: the card decides by its own width,
+   not by the window's, which is 300-odd pixels wider than the app frame. */
+.fit-w { container-type: inline-size; }
+.acts.fit { display: grid; grid-template-columns: 1fr; gap: 7px; }
+/* Two questions, two options each, in a card wide enough for both. Side by
+   side they cost one question's height instead of two. */
+/* One question per row, label beside its segment rather than above it: that
+   is one row per question instead of two, and the segment still has the width
+   to keep every option on a single line. */
+.v-two { display: grid; gap: 9px; }
+.v-two > .field { display: grid; grid-template-columns: 150px minmax(0, 1fr);
+                  gap: 0 14px; align-items: center; }
+/* Outside that layout — the builder's own two-column section — there is no
+   room for a label and a segment side by side, so the label stays above. */
+.sect:not(#variantWrap) .seg.wide { margin-top: 4px; }
+
+/* Pills, one per option, for a question that sits next to a segment and
+   should not look like one. They fold to a single column rather than squeeze
+   a label, because the builder's column is narrower than the step's. */
+.chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+/* The content type's card again, a size down: the same tile, words and tick
+   the steps either side of this one use to say "pick one". */
+.chip {
+    position: relative; display: flex; align-items: center; gap: 10px; min-width: 0;
+    padding: 6px 10px; border: 1px solid var(--p-border); border-radius: 10px;
+    background: #fff; cursor: pointer; transition: border-color .12s, box-shadow .12s;
+}
+.chip input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
+.chips .act-ic { width: 26px; height: 26px; border-radius: 7px; }
+.chips .act-ic svg { width: 15px; height: 15px; }
+.chip-t { font-size: 12.5px; line-height: 1.3; min-width: 0; }
+.chip:hover { border-color: #b5b5b5; }
+.chip.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.chip:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
+/* Three across, or one down. Never two and an orphan. */
+@container (min-width: 700px) {
+    .acts.fit { grid-template-columns: repeat(3, 1fr); }
+}
+/* position: relative is load-bearing. The real radio inside is absolutely
+   positioned to hide it, and without a positioned ancestor its containing
+   block is the page itself — so four hidden 1px inputs in a scrolling column
+   stretched the document 72px past the app frame and gave the window a second
+   scrollbar with white under the chrome. */
+.act {
+    position: relative;
+    display: flex; gap: 10px; align-items: flex-start; padding: 9px 11px;
+    border: 1px solid var(--p-border); border-radius: 10px; background: #fff;
+    cursor: pointer; transition: border-color .12s, box-shadow .12s;
+}
+.act:hover { border-color: #b5b5b5; }
+.act input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
+.act-mark {
+    width: 16px; height: 16px; border-radius: 50%; flex: none; margin-top: 1px;
+    border: 1.5px solid #b5b5b5; position: relative;
+}
+.act-c { min-width: 0; }
+.act-t { display: block; font-size: 12.5px; font-weight: 550; line-height: 1.3; }
+.act-d { display: block; font-size: 11.5px; color: var(--p-text-sub);
+         line-height: 1.35; margin-top: 2px; }
+/* The content type's card, for the questions that are not about content.
+   The tile is quiet until chosen, because the colours on those tiles say
+   which kind of thing is being locked and belong to that grid alone. */
+.acts.tiles .act { gap: 11px; align-items: center; }
+.act-ic {
+    width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid;
+    place-items: center; background: #f1f1f1; color: #5c5c5c;
+    transition: background .12s, color .12s;
+}
+.act-ic svg { width: 16px; height: 16px; }
+.act.on .act-ic, .chip.on .act-ic { background: var(--accent); color: #fff; }
+.act-tick {
+    width: 16px; height: 16px; border-radius: 50%; flex: none; margin-left: auto;
+    background: var(--accent); position: relative; opacity: 0; transform: scale(.7);
+    transition: opacity .12s, transform .12s;
+}
+.act-tick:after {
+    content: ''; position: absolute; left: 5px; top: 3.5px; width: 4px; height: 7px;
+    border: solid #fff; border-width: 0 1.6px 1.6px 0; transform: rotate(42deg);
+}
+.act.on .act-tick, .chip.on .act-tick { opacity: 1; transform: none; }
+/* Where the row is tight the tile goes before the tick does: the tick is the
+   only thing saying which one is chosen. */
+@media (min-width: 901px) and (max-height: 694px) {
+    .act-ic { width: 24px; height: 24px; border-radius: 7px; }
+    .act-ic svg { width: 14px; height: 14px; }
+}
+
+/* One line, always: these sentences are written to fit, and where the window
+   is too narrow for them the row cuts rather than growing a second line. */
+#action .act-d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The same card with a square mark, for the settings that are on or off
+   rather than one-of. */
+.act-box {
+    width: 16px; height: 16px; border-radius: 4px; flex: none; margin-top: 1px;
+    border: 1.5px solid #b5b5b5; background: #fff; position: relative;
+}
+.act input:checked + .act-box { background: var(--accent); border-color: var(--accent); }
+.act input:checked + .act-box:after {
+    content: ''; position: absolute; left: 4.5px; top: 1px; width: 4px; height: 8px;
+    border: solid #fff; border-width: 0 1.7px 1.7px 0; transform: rotate(42deg);
+}
+.act.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.act.on .act-mark { border-color: var(--accent); }
+.act.on .act-mark:after {
+    content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent);
+}
+.act:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
+
+.opts2 { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; align-items: stretch; }
+.opts2 .opt { margin-bottom: 0; padding: 9px 11px; gap: 10px; align-items: center; }
+.opts2 .opt-t { font-size: 12.5px; line-height: 1.3; }
+.opts2 .opt-d { font-size: 11.5px; line-height: 1.35; margin-top: 2px; }
+.opt-ic {
+    width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid;
+    place-items: center; background: #f1f1f1; color: #5c5c5c;
+    transition: background .12s, color .12s;
+}
+.opt-ic svg { width: 16px; height: 16px; }
+
+/* What a lock can protect, in the app's own hues. "Hide price rule" is a kind
+   of lock rather than a type of content, and it sits on products — so it
+   carries the product colour, which is what it targets. */
+.opt[data-sum="Products"] .opt-ic,
+.opt[data-sum="Hide price rule"] .opt-ic { background: var(--t-product-bg); color: var(--t-product-fg); }
+.opt[data-sum="Collections"] .opt-ic { background: var(--t-collection-bg); color: var(--t-collection-fg); }
+.opt[data-sum="Pages"] .opt-ic { background: var(--t-page-bg); color: var(--t-page-fg); }
+.opt[data-sum="Blogs"] .opt-ic { background: var(--t-blog-bg); color: var(--t-blog-fg); }
+.opt[data-sum="Liquid theme"] .opt-ic { background: var(--t-theme-bg); color: var(--t-theme-fg); }
+.opt[data-sum="Checkout"] .opt-ic { background: var(--t-checkout-bg); color: var(--t-checkout-fg); }
+.opt[data-sum="Store"] .opt-ic { background: var(--t-shop-bg); color: var(--t-shop-fg); }
+
+/* Chosen, the tile stops naming its type and starts saying "this one". */
+.opt.on .opt-ic { background: var(--accent); color: #fff; }
+/* The selection bar under the choices. Dashed until something is in it. */
+.pickbar {
+    display: flex; align-items: center; gap: 11px; flex: none;
+    padding: 9px 11px; border-radius: 10px;
+    border: 1px dashed var(--p-border); background: #fcfcfc;
+}
+.pickbar.set { border-style: solid; background: #fff; }
+.pickbar #clearItems { flex: none; }
+@media (max-width: 600px) {
+    .pickbar { flex-wrap: wrap; }
+    .pickbar .grow { flex: 1 0 100%; }
+    .pickbar #clearItems, .pickbar #browse { flex: 1; }
+}
+.pickbar-ic {
+    width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid;
+    place-items: center; background: #f1f1f1; color: #8a8a8a;
+}
+.pickbar-ic svg { width: 16px; height: 16px; }
+.pickbar.set .pickbar-ic { background: var(--p-success-bg); color: var(--p-success-fg); }
+.pickbar .help { display: block; margin-top: 1px; }
+
+.opt-tick {
+    width: 16px; height: 16px; border-radius: 50%; flex: none; margin-left: auto;
+    background: var(--accent); position: relative; opacity: 0; transform: scale(.7);
+    transition: opacity .12s, transform .12s;
+}
+.opt-tick:after {
+    content: ''; position: absolute; left: 5px; top: 3.5px; width: 4px; height: 7px;
+    border: solid #fff; border-width: 0 1.6px 1.6px 0; transform: rotate(42deg);
+}
+.opt.on .opt-tick { opacity: 1; transform: none; }
+
+.fields2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.field .label { font-size: 12.5px; }
+
+/* A condition, as the builder draws it: a numbered header, the type, and
+   whatever that type needs. */
+/* A condition in the list: one line, because the form that fills it in
+   lives in a modal. Rows this size never outgrow the card. */
+.crow {
+    display: flex; align-items: center; gap: 10px; padding: 7px 11px; flex: none;
+    border: 1px solid var(--p-border); border-radius: 10px; background: #fff;
+    margin-bottom: 6px; cursor: pointer; transition: border-color .12s;
+}
+.crow:hover { border-color: var(--accent); }
+.crow-n {
+    width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid;
+    place-items: center; font-size: 11px; font-weight: 700;
+    background: var(--v-50); color: var(--accent-deep);
+}
+/* The name of the check, and under it what it was set to — the row is
+   worth reading without opening it. */
+.crow-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.crow-t {
+    min-width: 0; font-size: 12.5px; font-weight: 550;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.crow-v {
+    font-size: 11.5px; color: var(--p-text-sub);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.crow-v.none { color: var(--p-text-disabled); }
+/* A list too long for its card gives back the value line, then its room. */
+#conds.tight .crow-v { display: none; }
+#conds.tighter .crow { padding: 5px 11px; margin-bottom: 4px; }
+#conds.tighter .crow-n { width: 19px; height: 19px; font-size: 10px; }
+/* The row opens a dialog, so it says so. */
+.crow-go { flex: none; display: grid; place-items: center; color: var(--p-text-disabled); }
+.crow-go svg { width: 14px; height: 14px; display: block; }
+.crow:hover .crow-go { color: var(--accent); }
+/* The bin the lock list and the widget list already use, at the end of a row
+   that is otherwise a number, a name and a tag. It stays out of the way until
+   the row is pointed at, because removing a condition is not the reason you
+   are looking at one. */
+.btn.crow-x { color: var(--p-text-disabled); opacity: 0; transition: opacity .12s, color .12s; }
+.crow:hover .btn.crow-x, .btn.crow-x:focus-visible { opacity: 1; }
+.btn.crow-x:hover { color: var(--p-critical-fg); background: var(--p-critical-bg); }
+/* Pointer-only hover is not a thing on a touch screen, so there it is always
+   visible. */
+@media (hover: none) { .btn.crow-x { opacity: 1; } }
+
+/* The condition form, in the modal. */
+.cond-f { display: flex; flex-direction: column; gap: 14px; }
+
+/* AND / OR. It governs every condition under it, so it is a control you
+   can read without opening anything. */
+.seg {
+    display: inline-flex; padding: 2px; gap: 2px; border-radius: 9px;
+    background: #f1f1f1; border: 1px solid var(--p-border);
+}
+.seg-b {
+    position: relative; display: flex; flex-direction: column; align-items: center;
+    padding: 4px 14px; border-radius: 7px; cursor: pointer; white-space: nowrap;
+    color: var(--p-text-sub);
+}
+.seg-t { font-size: 12.5px; font-weight: 650; letter-spacing: .03em; line-height: 1.35; }
+/* The same control carrying a sentence rather than a word: it fills its row,
+   splits it evenly, and drops the small-caps weight that AND / OR wants. */
+/* A widget design is a set of colours, so the picker shows them: the card,
+   its text, and the button on it. Three of these take less room than the
+   select they replace. */
+/* The wording fields. Their own grid rather than .fields2, which step 3
+   pins to one column for the design row above them. */
+/* Six columns, used as two then threes: the title and the message take half
+   the row each, and the boxes a shopper fills — with the button that submits
+   them — go three to a line. */
+/* The three style numbers are small and belong together, so they share a
+   line rather than stacking. */
+/* The editor's own section headings. The margin lives here rather than
+   inline so the shortest windows can tighten it. */
+.new-h { margin: 14px 0 7px; }
+
+.wstyle { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; }
+@media (max-width: 900px) { .wstyle { grid-template-columns: 1fr 1fr; } }
+
+.wfields { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 14px; }
+.wfields > .field { grid-column: span 2; }
+.wfields > .field:nth-child(1), .wfields > .field:nth-child(2) { grid-column: span 3; }
+@media (max-width: 900px) {
+    .wfields { grid-template-columns: 1fr; }
+    .wfields > .field, .wfields > .field:nth-child(1), .wfields > .field:nth-child(2) {
+        grid-column: auto;
+    }
+}
+
+/* The designs and the way to make another one, in one wrapping row. The
+   group keeps its own element for the radiogroup role and gets out of the
+   way of the layout. */
+.picks-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+.picks { display: contents; }
+.pick {
+    position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 11px 5px 5px;
+    border: 1px solid var(--p-border); border-radius: 999px; background: #fff; cursor: pointer;
+    transition: border-color .12s, box-shadow .12s;
+}
+.pick input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
+.pick-sw {
+    width: 30px; height: 24px; border-radius: 6px; flex: none; display: grid;
+    align-content: center; justify-items: center; gap: 2px;
+    border: 1px solid rgba(0, 0, 0, .14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25);
+}
+.pick-sw::before { content: ''; width: 15px; height: 2px; border-radius: 2px;
+                   background: currentColor; opacity: .75; }
+.pick-sw i { width: 17px; height: 5px; border-radius: 2px; display: block; }
+.pick-n { font-size: 12.5px; font-weight: 550; white-space: nowrap; }
+.pick:hover { border-color: #b5b5b5; }
+.pick.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pick:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
+/* The same pill, in outline: it makes one of the things beside it. */
+.pick-add {
+    display: flex; align-items: center; gap: 8px; padding: 5px 13px 5px 6px;
+    border: 1px dashed #b5b5b5; border-radius: 999px; background: transparent;
+    font: inherit; color: var(--p-text-sub); cursor: pointer;
+    transition: border-color .12s, color .12s;
+}
+.pick-plus {
+    width: 30px; height: 24px; border-radius: 6px; flex: none; display: grid;
+    place-items: center; font-size: 15px; line-height: 1; background: #f1f1f1;
+}
+.pick-add:hover { border-color: var(--accent); color: var(--p-text); }
+.pick-add:hover .pick-plus { background: var(--accent-soft); color: var(--accent-deep); }
+.pick-add:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
+
+/* The widget editor's two outcomes, at the foot of the panel and stuck to it:
+   the editor is longer than the step at most heights, and while it is open
+   these are the only ways out of it. */
+.new-foot {
+    position: sticky; bottom: 0; justify-content: flex-end; margin-top: 12px;
+    padding: 10px 0 2px; background: #fff;
+    box-shadow: 0 -8px 10px -8px rgba(0, 0, 0, .12);
+}
+
+.seg.wide { display: flex; width: 100%; }
+.seg.wide .seg-b { flex: 1; padding: 5px 10px; min-width: 0; }
+.seg.wide .seg-t { font-weight: 550; letter-spacing: 0; white-space: normal; text-align: center; }
+.seg-d { font-size: 10.5px; line-height: 1.25; color: var(--p-text-disabled); }
+.seg-b.on .seg-d { color: var(--p-text-sub); }
+.seg-b input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
+.seg-b:hover { color: var(--p-text); }
+.seg-b.on {
+    background: #fff; color: var(--accent-deep);
+    box-shadow: 0 1px 2px rgba(26, 26, 26, .12);
+}
+.seg-b:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Adding a condition is the obvious next move, so it looks like a slot
+   waiting to be filled rather than a button parked under the list. */
+.addtile {
+    display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%;
+    padding: 10px; border: 1px dashed var(--p-border); border-radius: 10px;
+    background: #fcfcfc; color: var(--p-text); font: inherit; font-size: 12.5px;
+    font-weight: 550; cursor: pointer; flex: none;
+    transition: border-color .12s, background .12s, color .12s;
+}
+.addtile:hover { border-color: var(--accent); background: var(--v-50); color: var(--accent-deep); }
+.addtile-p { font-size: 15px; line-height: 1; }
+
+/* The resource and bulk pickers. */
+/* The toolbar over the list: what is chosen, and the two things you can do
+   about it. It replaces a static "Showing 6 of 6 items". */
+.pick-bar {
+    display: flex; align-items: center; gap: 10px; padding: 9px 16px;
+    border-bottom: 1px solid var(--p-border-soft); background: #fafafa;
+}
+.pick-n { font-size: 12.5px; font-weight: 550; }
+.pick-n.none { font-weight: 450; color: var(--p-text-sub); }
+.pick-bar .btn { padding: 4px 11px; font-size: 12px; }
+/* Re-fetching from Shopify is a maintenance action, not a thing to read, so
+   it is an icon with a label rather than a link in the middle of the row. */
+.pick-sync { display: inline-flex; align-items: center; gap: 6px; }
+.pick-sync svg { width: 13px; height: 13px; }
+.syncing .pick-sync svg { animation: spin .7s linear infinite; }
+
+.pick-row {
+    display: flex; gap: 12px; align-items: center; padding: 10px 16px;
+    border-bottom: 1px solid var(--p-border-soft); cursor: pointer;
+    transition: background .1s;
+}
+.pick-row:hover { background: #fafafa; }
+/* Chosen, the whole row says so — a 16px checkbox is not enough to find your
+   four ticks in a list of twenty. */
+.pick-row.on { background: var(--v-50); box-shadow: inset 3px 0 0 var(--accent); }
+.pick-row.on:hover { background: var(--v-100); }
+.thumb {
+    width: 36px; height: 36px; border-radius: 8px; flex: none; background: #f1f1f1;
+    border: 0; display: grid; place-items: center; color: #8a8a8a;
+}
+/* The same hues the choice tiles and the list pills use, so a picker full of
+   products looks like the Products tile that opened it. */
+.thumb.products, .thumb.hide-price-rule { background: var(--t-product-bg); color: var(--t-product-fg); }
+.thumb.collections { background: var(--t-collection-bg); color: var(--t-collection-fg); }
+.thumb.pages { background: var(--t-page-bg); color: var(--t-page-fg); }
+.thumb.blogs { background: var(--t-blog-bg); color: var(--t-blog-fg); }
+.thumb.liquid-theme { background: var(--t-theme-bg); color: var(--t-theme-fg); }
+
+/* Whole rows. 262px against a 57px row left a row and a half showing at the
+   bottom, which reads as a rendering accident rather than as "there is more". */
+.pick-list { max-height: 285px; overflow-y: auto; }
+.pick-empty { padding: 34px 16px; text-align: center; color: var(--p-text-sub); font-size: 13px; }
+
+/* The toggle sits on white, so on is the accent and off is a plain grey. */
+.toggle {
+    width: 36px; height: 20px; border-radius: 999px; background: var(--accent);
+    border: 0; position: relative; cursor: pointer; flex: none;
+}
+.toggle:after { content: ''; position: absolute; top: 2px; right: 2px; width: 16px;
+                height: 16px; border-radius: 50%; background: #fff; transition: all .15s; }
+.toggle.off { background: #c9c9c9; }
+.toggle.off:after { right: calc(100% - 18px); }
+
+
+/* ------------------------------------------------- the widget editor ----- */
+/* A widget is a design any lock can use, so it is created the same way from
+   setup and from the builder. */
+
+.palettes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: none; }
+.pal {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px; text-align: left;
+    border: 1px solid var(--p-border); border-radius: 10px; background: #fff;
+    font: inherit; font-size: 12.5px; font-weight: 550; cursor: pointer;
+}
+.pal:hover { border-color: #b5b5b5; }
+.pal.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.pal-sw { display: flex; gap: 3px; margin-left: auto; flex: none; }
+.pal i, .sw { display: block; width: 15px; height: 15px; border-radius: 4px;
+              border: 1px solid rgba(0, 0, 0, .15); }
+
+.swatch {
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 6px;
+    border: 1px solid var(--p-border); border-radius: 999px; background: #fff;
+    font-size: 12.5px; font-weight: 550; cursor: pointer;
+}
+.swatch input[type="color"] {
+    width: 20px; height: 20px; padding: 0; border: 1px solid rgba(0, 0, 0, .18);
+    border-radius: 5px; background: none; cursor: pointer;
+}
+
+/* The preview is bigger here than on the steps: this screen is only about
+   how it looks. */
+.wpreview { width: 100%; padding: 15px 14px; text-align: center; border-radius: 12px; }
+.wp-ico { font-size: 19px; }
+.wp-t { font-size: 15px; font-weight: 700; margin-top: 6px; }
+.wp-m { font-size: 11.5px; opacity: .85; margin-top: 5px; line-height: 1.4; }
+.wp-field { text-align: left; margin-top: 9px; }
+.wp-l { font-size: 11px; font-weight: 600; display: block; margin-bottom: 4px; }
+.wp-in {
+    display: block; padding: 8px 10px; border-radius: 7px; font-size: 11.5px;
+    background: rgba(255, 255, 255, .92); border: 1px solid rgba(0, 0, 0, .14); color: #8a8a8a;
+}
+.wp-b { margin-top: 12px; padding: 9px; border-radius: 8px; font-size: 12.5px; font-weight: 700; }
+
+
+/* =============================================================== one page ===
+   The shape both builders use: create or edit one thing on a single page.
+   A header row with the actions, numbered section cards down the left, a
+   preview that follows you down the right, and a save bar that turns up once
+   there is something to save.
+   =========================================================================== */
+
+.pg-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+/* Every screen with a parent says which one, above its own title and on
+   the same left edge as it. A bare arrow beside a heading is a character,
+   not a control. */
+.back-l {
+    display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 550;
+    color: var(--p-text-sub); text-decoration: none; padding: 5px 10px; margin-left: -10px;
+    border-radius: 8px; transition: background .12s, color .12s;
+}
+.back-l svg { transition: transform .12s; }
+.back-l:hover svg { transform: translateX(-2px); }
+.back-l:hover { background: #f1f1f1; color: var(--p-text); }
+.pg-t { font-size: 20px; font-weight: 650; letter-spacing: -.015em; }
+
+.one { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+.one-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* The preview follows you down the page. On a stepper it is a step you have
+   to arrive at; here it is beside whatever you are changing. */
+.one-rail { position: sticky; top: 0; }
+
+.sec-c {
+    background: #fff; border: 1px solid var(--p-border-soft); border-radius: 12px;
+    box-shadow: var(--p-card-shadow); overflow: hidden;
+}
+.sec-hd {
+    display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px;
+    border-bottom: 1px solid var(--p-border-soft);
+}
+/* Numbered, because the sections are an order even when they are all visible:
+   you cannot choose who gets in before you have said what the lock covers. */
+.sec-n {
+    width: 23px; height: 23px; border-radius: 50%; flex: none; display: grid;
+    place-items: center; font-size: 11.5px; font-weight: 700;
+    background: var(--accent); color: #fff; margin-top: 1px;
+}
+.sec-t2 { font-size: 14px; font-weight: 650; }
+.sec-d2 { font-size: 12.5px; color: var(--p-text-sub); margin-top: 3px; }
+.sec-b { padding: 16px 18px; }
+/* A section with nothing left to answer greys its number and says why inside. */
+.sec-c.off .sec-n { background: #d4d4d4; }
+
+.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 26px; }
+.two-col > div { min-width: 0; }
+.sect { margin: 0; }
+.sect .sec-l { display: block; margin-bottom: 7px; }
+.sect + .sect { border-top: 1px solid var(--p-border-soft); margin-top: 14px; padding-top: 14px; }
+.two-col > div + div > .sect:first-child {
+    border-top: 1px solid var(--p-border-soft); margin-top: 14px; padding-top: 14px;
+}
+@media (min-width: 761px) {
+    .two-col > div + div > .sect:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+}
+
+.rail-c {
+    background: #fff; border: 1px solid var(--p-border-soft); border-radius: 12px;
+    box-shadow: var(--p-card-shadow); overflow: hidden;
+}
+.rail-c .stage { border: 0; border-radius: 0; width: auto; padding: 16px 14px 12px; }
+.rail-c .stage { position: relative; }
+.rail-c .device { transition: filter .25s, opacity .25s; }
+.rail-c .device.off .sk, .rail-c .device.off .veil { filter: grayscale(.9); opacity: .45; }
+.dev-badge {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 3;
+    padding: 5px 12px; border-radius: 999px; white-space: nowrap;
+    font-size: 11px; font-weight: 650;
+    background: var(--p-warning-bg); color: var(--p-warning-fg);
+    box-shadow: 0 4px 14px rgba(26, 26, 26, .16);
+}
+
+/* What the thing adds up to. Scoped, because the black panel has its own
+   .sum-k and .sum-v and both are still in use. */
+.osums { list-style: none; margin: 0; padding: 12px 16px 14px;
+         border-top: 1px solid var(--p-border-soft); }
+.osums .sum { display: flex; gap: 10px; padding: 7px 0; font-size: 12.5px; }
+.osums .sum + .sum { border-top: 1px solid var(--p-border-soft); }
+.osums .sum-k { font-size: 12.5px; color: var(--p-text-sub); flex: none; width: 74px; display: block; }
+.osums .sum-v { font-size: 12.5px; color: var(--p-text-disabled); min-width: 0; }
+.osums .sum.set .sum-v { color: var(--p-text); font-weight: 550; }
+
+/* A .field is a flex column, so a button inside one is stretched to the width
+   of the select above it. A link in all but name should be as wide as its
+   words. */
+.field > [data-new] { align-self: flex-start; }
+
+/* Deleting is the one action on these pages that cannot be undone, and
+   nothing else in the folder needs a destructive button. */
+.btn.danger { background: var(--p-critical-fg); border-color: var(--p-critical-fg); color: #fff; }
+.btn.danger:hover { background: #701808; border-color: #701808; }
+
+/* Shopify's own pattern: the page keeps its actions at the top, and a bar
+   appears at the bottom once there is something to save, so Save is reachable
+   from wherever you stopped typing. */
+.savebar {
+    position: sticky; bottom: 0; z-index: 30; margin-top: 14px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 11px 16px; border-radius: 12px;
+    background: var(--ink-0); color: #fff;
+    box-shadow: 0 -2px 30px -14px rgba(0, 0, 0, .5);
+    transform: translateY(8px); opacity: 0; pointer-events: none;
+    transition: opacity .16s, transform .16s;
+}
+.savebar.on { transform: none; opacity: 1; pointer-events: auto; }
+.savebar .sb-t { font-size: 13px; font-weight: 600; }
+.savebar .sb-d { font-size: 12px; color: #9a9a9a; margin-top: 2px; }
+.savebar .btn { background: transparent; border-color: #4a4a4a; color: #fff; box-shadow: none; }
+.savebar .btn:hover { background: #2a2a2a; }
+.savebar .btn.primary { background: #fff; border-color: #fff; color: #1a1a1a; }
+.savebar .btn.primary:hover { background: #e9e9e9; }
+.savebar .btn:disabled { opacity: .45; }
+
+@media (max-width: 1100px) {
+    .one { grid-template-columns: minmax(0, 1fr); }
+    /* Stacked, a sticky rail would pin a 500px card over the form. */
+    .one-rail { position: static; }
+    .rail-c { display: flex; align-items: center; gap: 0; }
+    .rail-c .stage { flex: none; }
+    .osums { border-top: 0; border-left: 1px solid var(--p-border-soft); flex: 1; }
+}
+@media (max-width: 760px) {
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+    .rail-c { display: block; }
+    .osums { border-left: 0; border-top: 1px solid var(--p-border-soft); }
+    .pg-head .row { width: 100%; }
+    .pg-head .row .btn { flex: 1; justify-content: center; }
+}

@@ -39,7 +39,7 @@ import { previewFields, resolvePopupCopy } from '../../lib/popupPreview';
  * widget, then catalog — and draws it with the selected widget's real colours,
  * so what it shows is what a shopper sees.
  */
-const FIELDS = [
+export const FIELDS = [
     {
         key: 'header',
         label: 'Title',
@@ -85,7 +85,7 @@ const FIELDS = [
 ];
 
 /** "title and button", "title, button and email label" — for the summary line. */
-function joinNames(names) {
+export function joinNames(names) {
     if (names.length <= 1) return names[0] || '';
     if (names.length === 2) return `${names[0]} and ${names[1]}`;
 

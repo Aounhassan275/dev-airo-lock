@@ -1,39 +1,10 @@
 import { router, usePage } from '@inertiajs/react';
-import {
-    Badge,
-    Banner,
-    BlockStack,
-    Box,
-    Button,
-    Card,
-    Divider,
-    Icon,
-    InlineGrid,
-    InlineStack,
-    Layout,
-    Page,
-    Text,
-} from '@shopify/polaris';
-import {
-    BlogIcon,
-    CheckIcon,
-    ClockIcon,
-    CodeIcon,
-    CollectionIcon,
-    DesktopIcon,
-    EmailIcon,
-    GlobeIcon,
-    HashtagIcon,
-    KeyIcon,
-    LinkIcon,
-    LockIcon,
-    PageIcon,
-    PersonIcon,
-    ProductIcon,
-    StoreIcon,
-} from '@shopify/polaris-icons';
+import { useMemo, useState } from 'react';
 import { lockKindLabel, resourceTypeLabel, resourceTypesFromRules } from '../lib/resourceTypes';
 import { splitListValue } from '../lib/listValue';
+import { previewFields, resolvePopupCopy } from '../lib/popupPreview';
+import { applyLanguageForPreview, isRTLLocale, preferredEditingLocale, translate } from '../lib/widgetLanguages';
+import '../../css/pages/lock-preview.css';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -52,28 +23,17 @@ const CONDITION_LABELS = {
     ageVerification: 'Age verification',
 };
 
-const CONDITION_ICONS = {
-    tag: HashtagIcon,
-    signedIn: PersonIcon,
-    singlePasscode: KeyIcon,
-    multiplePasscodes: KeyIcon,
-    singleSecretLink: LinkIcon,
-    location: GlobeIcon,
-    specificEmail: EmailIcon,
-    emailContains: EmailIcon,
-    emailFromList: EmailIcon,
-    pairedCredentials: KeyIcon,
-    ip: DesktopIcon,
-    ageVerification: PersonIcon,
-};
+// Conditions that draw an input on the storefront popup are "Form"; the rest
+// are checked silently ("Text").
+const FORM_TYPES = new Set([
+    'singlePasscode', 'multiplePasscodes', 'specificEmail', 'emailContains',
+    'emailFromList', 'pairedCredentials', 'ageVerification',
+]);
 
-const RESOURCE_ICONS = {
-    product: ProductIcon,
-    collection: CollectionIcon,
-    page: PageIcon,
-    blog: BlogIcon,
-    theme: CodeIcon,
-    shop: StoreIcon,
+const REPROMPT_LABELS = {
+    remember: 'Once per device',
+    session: 'On their next visit',
+    always: 'On every page',
 };
 
 function conditionValueLabel(cond) {
@@ -96,94 +56,13 @@ function conditionValueLabel(cond) {
         const lines = splitListValue(cond.value || '').filter((s) => s.trim());
         return `${lines.length} ${noun}${lines.length !== 1 ? 's' : ''}`;
     }
-    return cond.value || '—';f
+    return cond.value || '—';
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function InfoRow({ label, children }) {
-    return (
-        <InlineStack align="space-between" blockAlign="start" gap="400">
-            <Text variant="bodySm" tone="subdued" as="span" minWidth="120px">
-                {label}
-            </Text>
-            <Box>{children}</Box>
-        </InlineStack>
-    );
-}
-
-function ConditionCard({ cond, index }) {
-    const CondIcon = CONDITION_ICONS[cond.type] || KeyIcon;
-    const { store, auth } = usePage().props;
-
-    // The storefront unlocks secret-link conditions via ?access=CODE — show
-    // the composed link here so merchants can retrieve it after saving, not
-    // only while editing. store.url holds the primary domain; the myshopify
-    // domain (users.name) is the fallback.
-    const storefrontBase =
-        (store?.url || '').replace(/\/+$/, '') || (auth?.user?.name ? `https://${auth.user.name}` : '');
-    const secretLink =
-        cond.type === 'singleSecretLink' && (cond.value || '').trim() && storefrontBase
-            ? `${storefrontBase}/?access=${encodeURIComponent(cond.value.trim())}`
-            : '';
-
-    return (
-        <div
-            style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 10,
-                padding: '12px 16px',
-                background: '#fafafa',
-            }}
-        >
-            <InlineStack gap="300" blockAlign="center">
-                <div
-                    style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        background: '#ede9fe',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                    }}
-                >
-                    <Icon source={CondIcon} tone="magic" />
-                </div>
-                <BlockStack gap="050">
-                    <InlineStack gap="200" blockAlign="center">
-                        <Text variant="bodySm" fontWeight="semibold" as="span">
-                            {CONDITION_LABELS[cond.type] || cond.type}
-                        </Text>
-                        <Badge tone="info" size="small">
-                            Condition {index + 1}
-                        </Badge>
-                    </InlineStack>
-                    <Text variant="bodySm" tone="subdued" as="span">
-                        {conditionValueLabel(cond)}
-                    </Text>
-                    {secretLink && (
-                        <InlineStack gap="200" blockAlign="center" wrap={false}>
-                            <Text variant="bodySm" as="span" breakWord>
-                                {secretLink}
-                            </Text>
-                            <Button
-                                size="micro"
-                                onClick={() => navigator.clipboard?.writeText(secretLink)}
-                            >
-                                Copy
-                            </Button>
-                        </InlineStack>
-                    )}
-                </BlockStack>
-            </InlineStack>
-        </div>
-    );
-}
-
-function RuleCard({ rule }) {
-    let conditions = rule.conditions || [];
+// A rule's conditions, as groups — accepts a JSON string, a flat list, or the
+// nested-groups format [{operator, conditions:[…]}].
+function ruleGroups(rule) {
+    let conditions = rule?.conditions || [];
     if (typeof conditions === 'string') {
         try {
             conditions = JSON.parse(conditions);
@@ -191,111 +70,211 @@ function RuleCard({ rule }) {
             conditions = [];
         }
     }
-
-    // Flatten if it's the nested-groups format [{operator, conditions:[…]}]
+    if (!Array.isArray(conditions)) conditions = [];
     const isGrouped =
-        Array.isArray(conditions) &&
         conditions.length > 0 &&
         conditions[0] &&
         typeof conditions[0] === 'object' &&
         'conditions' in conditions[0];
+    return isGrouped ? conditions : [{ operator: 'AND', conditions }];
+}
 
-    const groups = isGrouped ? conditions : [{ operator: 'AND', conditions }];
+const fmtDate = (v) =>
+    v ? new Date(v).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
+const fmtDateTime = (v) => (v ? new Date(v).toLocaleString() : '—');
 
-    const ResourceIcon = RESOURCE_ICONS[rule.resource_type] || ProductIcon;
+const BackLink = () => (
+    <a
+        className="back-l"
+        href="/locks"
+        onClick={(e) => { e.preventDefault(); router.visit('/locks'); }}
+    >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+        </svg>
+        Locks
+    </a>
+);
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function ConditionRow({ cond, index }) {
+    const { store, auth } = usePage().props;
+    const [copied, setCopied] = useState(false);
+
+    // The storefront unlocks secret-link conditions via ?access=CODE — show
+    // the composed link here so merchants can retrieve it after saving.
+    // store.url holds the primary domain; the myshopify domain (users.name)
+    // is the fallback.
+    const storefrontBase =
+        (store?.url || '').replace(/\/+$/, '') || (auth?.user?.name ? `https://${auth.user.name}` : '');
+    const secretLink =
+        cond.type === 'singleSecretLink' && (cond.value || '').trim() && storefrontBase
+            ? `${storefrontBase}/?access=${encodeURIComponent(cond.value.trim())}`
+            : '';
+    const isForm = FORM_TYPES.has(cond.type);
 
     return (
-        <Card padding="400">
-            <BlockStack gap="300">
-                {/* Resource header */}
-                <InlineStack gap="300" blockAlign="center">
-                    <div
-                        style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 8,
-                            background: '#f3f0ff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
+        <div className="cond">
+            <div className="row g8">
+                <span className="sm strong grow">{CONDITION_LABELS[cond.type] || cond.type || 'Condition'}</span>
+                <span className="xs sub">Condition {index + 1}</span>
+                <span className={`tag ${isForm ? 'form' : 'text'}`}>{isForm ? 'Form' : 'Text'}</span>
+            </div>
+            <div className="row g16 mt8 wrap">
+                <div><span className="sec-l">Type</span><div className="sm">{cond.type || '—'}</div></div>
+                <div><span className="sec-l">Value</span><div className="sm mono">{conditionValueLabel(cond)}</div></div>
+            </div>
+            {secretLink && (
+                <div className="link-row">
+                    <span className="xs mono grow">{secretLink}</span>
+                    <button
+                        type="button"
+                        className="btn"
+                        onClick={() => {
+                            navigator.clipboard?.writeText(secretLink);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1500);
                         }}
                     >
-                        <Icon source={ResourceIcon} tone="magic" />
-                    </div>
-                    <BlockStack gap="050">
-                        <Text variant="bodyMd" fontWeight="semibold" as="span">
-                            {rule.title || rule.handle}
-                        </Text>
-                        <InlineStack gap="150">
-                            <Text variant="bodySm" tone="subdued" as="span">
-                                {rule.resource_type}
-                            </Text>
-                            {rule.handle && (
-                                <Text variant="bodySm" tone="subdued" as="span">
-                                    · {rule.handle}
-                                </Text>
-                            )}
-                        </InlineStack>
-                    </BlockStack>
-                    <div style={{ marginLeft: 'auto' }}>
-                        <Badge tone={rule.enabled ? 'success' : 'attention'}>
-                            {rule.enabled ? 'Active' : 'Inactive'}
-                        </Badge>
-                    </div>
-                </InlineStack>
+                        {copied ? 'Copied' : 'Copy'}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
 
-                <Divider />
+function RuleCard({ rule, index }) {
+    const groups = ruleGroups(rule);
 
-                {/* Conditions */}
-                {groups.map((group, gi) => (
-                    <BlockStack key={gi} gap="200">
-                        {groups.length > 1 && (
-                            <InlineStack gap="200" blockAlign="center">
-                                <Text variant="bodySm" fontWeight="medium" tone="subdued" as="span">
-                                    Group {gi + 1}
-                                </Text>
-                                <Badge>
-                                    {group.operator === 'AND' ? 'All must match' : 'Any can match'}
-                                </Badge>
-                            </InlineStack>
-                        )}
-                        {(group.conditions || []).map((cond, ci) => (
-                            <ConditionCard key={ci} cond={cond} index={ci} />
-                        ))}
-                        {gi < groups.length - 1 && (
-                            <InlineStack align="center">
-                                <Badge tone="info">OR</Badge>
-                            </InlineStack>
-                        )}
-                    </BlockStack>
-                ))}
-
-                {/* Redirect URL */}
-                {rule.redirect_url && (
-                    <>
-                        <Divider />
-                        <InfoRow label="Redirect URL">
-                            <Text variant="bodySm" as="span" breakWord>
-                                {rule.redirect_url}
-                            </Text>
-                        </InfoRow>
-                    </>
+    return (
+        <div className="rule">
+            <div className="row g8 wrap">
+                <span className="tag">Rule {index + 1}</span>
+                <span className="sm strong grow" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                    {rule.title || rule.handle || 'Untitled item'}
+                </span>
+                {rule.resource_type && (
+                    <span className={`pill ${rule.resource_type}`}>{resourceTypeLabel(rule.resource_type, 1)}</span>
                 )}
+                <span className={`tag ${rule.enabled ? 'live' : 'idle'}`}>{rule.enabled ? 'Active' : 'Inactive'}</span>
+            </div>
+            {rule.handle && rule.title && <div className="xs sub mt4">{rule.handle}</div>}
 
-                {/* Price-hide settings */}
-                {rule.price_message && (
-                    <>
-                        <Divider />
-                        <InfoRow label="Hidden price msg">
-                            <Text variant="bodySm" as="span">
-                                {rule.price_message}
-                            </Text>
-                        </InfoRow>
-                    </>
-                )}
-            </BlockStack>
-        </Card>
+            {groups.map((group, gi) => (
+                <div key={gi}>
+                    {groups.length > 1 && (
+                        <div className="row g8 mt12">
+                            <span className="xs strong sub">Group {gi + 1}</span>
+                            <span className="tag">{group.operator === 'AND' ? 'All must match' : 'Any can match'}</span>
+                        </div>
+                    )}
+                    {(group.conditions || []).map((cond, ci) => (
+                        <ConditionRow key={ci} cond={cond} index={ci} />
+                    ))}
+                    {gi < groups.length - 1 && (
+                        <div className="cond-or"><span className="tag form">OR</span></div>
+                    )}
+                </div>
+            ))}
+
+            {rule.redirect_url && (
+                <div className="kv" style={{ borderTop: '1px solid var(--p-border-soft)', marginTop: 9 }}>
+                    <span className="sub">Redirect URL</span><span className="sm">{rule.redirect_url}</span>
+                </div>
+            )}
+            {rule.price_message && (
+                <div className="kv" style={{ borderTop: '1px solid var(--p-border-soft)', marginTop: rule.redirect_url ? 0 : 9 }}>
+                    <span className="sub">Hidden price msg</span><span className="sm">{rule.price_message}</span>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/**
+ * What shoppers see: the storefront popup over a dimmed page, on the light
+ * stage. Wording resolves the same way the storefront does (lock override →
+ * widget value → translated default); boxes come from the conditions.
+ */
+function StagePreview({ lock, widget, groups }) {
+    const design = widget?.configuration?.designOptions || {};
+    const language = widget?.configuration?.language || null;
+
+    const copy = useMemo(() => {
+        applyLanguageForPreview({ ...(language || {}), mode: 'auto' });
+        const locale = preferredEditingLocale(language, [], '');
+        return {
+            ...resolvePopupCopy({
+                text: lock.popup_text || {},
+                description: lock.description || '',
+                design,
+                translate: (key) => translate(key, locale),
+            }),
+            rtl: isRTLLocale(locale),
+        };
+    }, [lock.popup_text, lock.description, design, language]);
+
+    const fields = useMemo(() => previewFields(groups), [groups]);
+
+    const colors = design.colors || {};
+    const cardColor = typeof colors.card === 'string' ? colors.card : '#ffffff';
+    const textColor = typeof colors.text === 'string' ? colors.text : '#333333';
+    const buttonBg = typeof colors.buttonBg === 'string' ? colors.buttonBg : '#15518C';
+    const buttonText = typeof colors.buttonText === 'string' ? colors.buttonText : '#ffffff';
+    const radius = Math.min(Number(design.layout?.cardBorderRadius) || 10, 18);
+
+    return (
+        <div className="stage w">
+            <div className="device">
+                <div className="sk">
+                    <i style={{ width: '46%', height: 12 }} /><i className="gap" />
+                    <i /><i style={{ width: '88%' }} /><i style={{ width: '70%' }} /><i className="gap" />
+                    <i style={{ width: '40%', height: 11 }} />
+                    <i /><i style={{ width: '80%' }} /><i className="gap" />
+                    <i style={{ width: '62%' }} /><i style={{ width: '86%' }} />
+                </div>
+                <div className="veil">
+                    <div
+                        className="lk"
+                        dir={copy.rtl ? 'rtl' : 'ltr'}
+                        style={{ background: cardColor, color: textColor, borderRadius: radius }}
+                    >
+                        <div className="lk-ico">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                                <rect x="4" y="10.5" width="16" height="10" rx="2.5" />
+                                <path d="M8 10.5V7.5a4 4 0 018 0v3" />
+                            </svg>
+                        </div>
+                        <div className="lk-t">{copy.title}</div>
+                        <div className="lk-m">{copy.description}</div>
+                        {fields.map((field, i) => {
+                            const label =
+                                field.label ||
+                                (field.kind === 'email' ? copy.emailLabel : field.kind === 'dob' ? copy.dobLabel : copy.passcodeLabel);
+                            const placeholder =
+                                field.kind === 'email' ? copy.emailPlaceholder : field.kind === 'dob' ? 'YYYY-MM-DD' : copy.passcodePlaceholder;
+                            return (
+                                <div key={i}>
+                                    <div className="lk-l">{label}</div>
+                                    <div className="lk-f">{placeholder}</div>
+                                </div>
+                            );
+                        })}
+                        <div className="lk-b" style={{ background: buttonBg, color: buttonText }}>{copy.button}</div>
+                    </div>
+                </div>
+            </div>
+            <span className="stage-cap">What shoppers see</span>
+            <p className="stage-note">
+                {widget?.name
+                    ? `Boxes come from the conditions; colours from the ${widget.name} design.`
+                    : 'No design is selected, so this shows the default look.'}
+            </p>
+        </div>
     );
 }
 
@@ -306,11 +285,16 @@ export default function LockConfigurePage() {
 
     if (!lock) {
         return (
-            <Page title="Lock Preview" backAction={{ content: 'Dashboard', onAction: () => router.visit('/') }}>
-                <Banner title="Lock not found" tone="critical">
-                    <Text>This lock could not be found or you do not have access to it.</Text>
-                </Banner>
-            </Page>
+            <div className="airo pg-lock-preview">
+                <main className="page full">
+                    <BackLink />
+                    <h1 style={{ fontSize: 20, fontWeight: 650, marginTop: 2 }}>Lock preview</h1>
+                    <div className="card card-p mt16">
+                        <span className="strong">Lock not found</span>
+                        <p className="sm sub mt4">This lock could not be found or you do not have access to it.</p>
+                    </div>
+                </main>
+            </div>
         );
     }
 
@@ -321,218 +305,171 @@ export default function LockConfigurePage() {
     const widget = lock.widget || null;
     const resourceTypes = resourceTypesFromRules(accessRules);
     const kindLabel = lockKindLabel(lock.type);
+    const activeRules = accessRules.filter((r) => r.enabled).length;
 
-    const createdAt = lock.created_at
-        ? new Date(lock.created_at).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-          })
-        : '—';
-    const updatedAt = lock.updated_at
-        ? new Date(lock.updated_at).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-          })
-        : '—';
+    const now = Date.now();
+    const startsMs = lock.starts_at ? Date.parse(lock.starts_at) : NaN;
+    const expiresMs = lock.expires_at ? Date.parse(lock.expires_at) : NaN;
+    const scheduled = !Number.isNaN(startsMs) && now < startsMs;
+    const expired = !Number.isNaN(expiresMs) && now >= expiresMs;
+
+    const stateNote = !isActive
+        ? 'Inactive. Saved, not enforcing anything on your storefront.'
+        : expired
+            ? `Expired on ${fmtDate(lock.expires_at)}. No longer enforced.`
+            : scheduled
+                ? `Scheduled. Starts enforcing on ${fmtDate(lock.starts_at)}.`
+                : 'Active. Enforcing on your storefront now.';
+    const stateTag = !isActive ? ['idle', 'Inactive'] : expired ? ['idle', 'Expired'] : scheduled ? ['now', 'Scheduled'] : ['live', 'Active'];
+
+    // Conditions are the same across a lock's rules; the first rule's groups
+    // drive the popup preview and the "Opens for" summary.
+    const firstGroups = accessRules.length > 0 ? ruleGroups(accessRules[0]) : [];
+    const conditionTypes = [
+        ...new Set(
+            accessRules.flatMap((r) => ruleGroups(r).flatMap((g) => (g.conditions || []).map((c) => c?.type))).filter(Boolean),
+        ),
+    ];
+    const opensFor = conditionTypes.map((t) => CONDITION_LABELS[t] || t).join(', or ');
+    const protects = resourceTypes.map(({ type, count }) => resourceTypeLabel(type, count)).join(', ');
+    const widgetLine = widget ? [widget.name, widget.type].filter(Boolean).join(' — ') : '';
+    const reprompt = REPROMPT_LABELS[lock.reprompt || 'remember'];
+
+    const goEdit = () => router.visit(`/lock/${lock.id}/configure`);
 
     return (
-        <Page
-            title={lock.name || 'Lock Preview'}
-            titleMetadata={
-                <InlineStack gap="200">
-                    <Badge tone={isActive ? 'success' : 'attention'}>{isActive ? 'Active' : 'Inactive'}</Badge>
-                    {resourceTypes.map(({ type, count }) => (
-                        <Badge key={type}>{resourceTypeLabel(type, count)}</Badge>
-                    ))}
-                    {kindLabel && <Badge tone="warning">{kindLabel}</Badge>}
-                </InlineStack>
-            }
-            subtitle={lock.description || undefined}
-            backAction={{ content: 'Dashboard', onAction: () => router.visit('/') }}
-            secondaryActions={
-                previewMode
-                    ? [
-                          {
-                              content: 'Edit lock',
-                              onAction: () => router.visit(`/lock/${lock.id}/configure`),
-                          },
-                      ]
-                    : []
-            }
-        >
-            {previewMode && (
-                <div style={{ marginBottom: 16 }}>
-                    <Banner tone="info">
-                        <Text>You are viewing this lock in <strong>preview mode</strong>. No changes can be made here.</Text>
-                    </Banner>
+        <div className="airo pg-lock-preview">
+            <main className="page full">
+                <div className="between wrap g12" style={{ marginBottom: 14 }}>
+                    <div style={{ minWidth: 0 }}>
+                        <BackLink />
+                        <div className="row g8 wrap" style={{ marginTop: 2 }}>
+                            <h1 style={{ fontSize: 20, fontWeight: 650 }}>{lock.name || 'Lock preview'}</h1>
+                            <span className={`tag ${stateTag[0]}`}>{stateTag[1]}</span>
+                            {kindLabel && <span className="tag pro">{kindLabel}</span>}
+                        </div>
+                        {lock.description && <p className="sm sub mt4">{lock.description}</p>}
+                        {previewMode && (
+                            <p className="xs sub mt4">You are viewing this lock in preview mode. No changes can be made here.</p>
+                        )}
+                    </div>
+                    {previewMode && (
+                        <button type="button" className="btn primary" onClick={goEdit}>Edit lock</button>
+                    )}
                 </div>
-            )}
 
-            <Layout>
-                <Layout.Section>
-                    <InlineGrid columns={{ xs: '1fr', md: '1fr 300px' }} gap="400">
-                        {/* ── Left: Access Rules ── */}
-                        <BlockStack gap="400">
-                            <Card padding="0">
-                                <Box padding="400" borderBlockEndWidth="025" borderColor="border">
-                                    <InlineStack align="space-between" blockAlign="center">
-                                        <Text variant="headingMd" as="h2">
-                                            Access Rules
-                                        </Text>
-                                        <Badge>{accessRules.length} rule{accessRules.length !== 1 ? 's' : ''}</Badge>
-                                    </InlineStack>
-                                </Box>
+                <div className="split">
+                    {/* The panel carries state; the work area carries the detail. */}
+                    <aside className="panel w">
+                        <div className="panel-eyebrow">Lock {lock.id}</div>
+                        <h2>{lock.name}</h2>
+                        <p className="panel-note">{stateNote}</p>
 
-                                <Box padding="400">
+                        <div className="panel-sep" />
+
+                        <div className="sum-head">At a glance</div>
+                        <div className={`sum-row${protects ? ' set' : ''}`}>
+                            <span className="sum-dot" />
+                            <span><span className="sum-k">Protects</span><span className="sum-v">{protects || 'Nothing yet'}</span></span>
+                        </div>
+                        <div className={`sum-row${opensFor ? ' set' : ''}`}>
+                            <span className="sum-dot" />
+                            <span><span className="sum-k">Opens for</span><span className="sum-v">{opensFor || 'No conditions set'}</span></span>
+                        </div>
+                        <div className={`sum-row${widget ? ' set' : ''}`}>
+                            <span className="sum-dot" />
+                            <span><span className="sum-k">Shows</span><span className="sum-v">{widgetLine || 'Default design'}</span></span>
+                        </div>
+                        <div className="sum-row set">
+                            <span className="sum-dot" />
+                            <span><span className="sum-k">Asks again</span><span className="sum-v">{reprompt || lock.reprompt}</span></span>
+                        </div>
+
+                        <div className="panel-sep" />
+
+                        <div className="sum-head">Schedule</div>
+                        <div className={`sum-row${lock.starts_at ? ' set' : ''}`}>
+                            <span className="sum-dot" />
+                            <span><span className="sum-k">Starts</span><span className="sum-v">{lock.starts_at ? fmtDateTime(lock.starts_at) : 'Immediately'}</span></span>
+                        </div>
+                        <div className={`sum-row${lock.expires_at ? ' set' : ''}`}>
+                            <span className="sum-dot" />
+                            <span><span className="sum-k">Expires</span><span className="sum-v">{lock.expires_at ? fmtDateTime(lock.expires_at) : 'Never'}</span></span>
+                        </div>
+
+                        <div className="panel-foot">
+                            <p className="xs">Created {fmtDate(lock.created_at)} &middot; updated {fmtDate(lock.updated_at)}</p>
+                        </div>
+                    </aside>
+
+                    <section className="work">
+                        <div className="work-body" style={{ paddingBottom: 0 }}>
+                            <div className="work-opts">
+                                <div className="sec">
+                                    <div className="between" style={{ marginBottom: 12 }}>
+                                        <span className="sec-h">
+                                            Access rules <span className="xs sub" style={{ fontWeight: 450 }}>{accessRules.length} rule{accessRules.length !== 1 ? 's' : ''}</span>
+                                        </span>
+                                        {previewMode && (
+                                            <button type="button" className="btn plain sm" onClick={goEdit}>Edit</button>
+                                        )}
+                                    </div>
                                     {accessRules.length > 0 ? (
-                                        <BlockStack gap="400">
-                                            {accessRules.map((rule, i) => (
-                                                <RuleCard key={rule.id ?? i} rule={rule} />
-                                            ))}
-                                        </BlockStack>
+                                        accessRules.map((rule, i) => <RuleCard key={rule.id ?? i} rule={rule} index={i} />)
                                     ) : (
-                                        <Box paddingBlock="600">
-                                            <InlineStack align="center">
-                                                <Text tone="subdued">No access rules configured for this lock.</Text>
-                                            </InlineStack>
-                                        </Box>
+                                        <p className="sm sub">No access rules configured for this lock.</p>
                                     )}
-                                </Box>
-                            </Card>
-                        </BlockStack>
+                                </div>
 
-                        {/* ── Right: Meta sidebar ── */}
-                        <BlockStack gap="400">
-                            {/* Lock details */}
-                            <Card>
-                                <BlockStack gap="400">
-                                    <Text variant="headingMd" as="h2">
-                                        Lock Details
-                                    </Text>
-                                    <Divider />
-                                    <BlockStack gap="300">
-                                        <InfoRow label="ID">
-                                            <Text variant="bodySm" as="span" tone="subdued">
-                                                #{lock.id}
-                                            </Text>
-                                        </InfoRow>
-                                        <InfoRow label="Type">
-                                            <InlineStack gap="100" wrap>
-                                                {resourceTypes.length > 0 ? (
-                                                    resourceTypes.map(({ type, count }) => (
-                                                        <Badge key={type}>{resourceTypeLabel(type, count)}</Badge>
+                                <div className="sec">
+                                    <span className="sec-h">Lock details</span>
+                                    <div className="mt12">
+                                        <div className="kv"><span className="sub">ID</span><span>#{lock.id}</span></div>
+                                        <div className="kv">
+                                            <span className="sub">Type</span>
+                                            <span className="row g4 wrap" style={{ justifyContent: 'flex-end' }}>
+                                                {resourceTypes.length > 0
+                                                    ? resourceTypes.map(({ type, count }) => (
+                                                        <span key={type} className={`pill ${type}`}>{resourceTypeLabel(type, count)}</span>
                                                     ))
-                                                ) : (
-                                                    <Text variant="bodySm" as="span" tone="subdued">No items</Text>
-                                                )}
-                                                {kindLabel && <Badge tone="warning">{kindLabel}</Badge>}
-                                            </InlineStack>
-                                        </InfoRow>
-                                        <InfoRow label="Status">
-                                            <Badge tone={isActive ? 'success' : 'attention'}>
-                                                {isActive ? 'Active' : 'Inactive'}
-                                            </Badge>
-                                        </InfoRow>
-                                        <InfoRow label="Created">
-                                            <Text variant="bodySm" as="span">
-                                                {createdAt}
-                                            </Text>
-                                        </InfoRow>
-                                        <InfoRow label="Updated">
-                                            <Text variant="bodySm" as="span">
-                                                {updatedAt}
-                                            </Text>
-                                        </InfoRow>
-                                        {lock.starts_at && (
-                                            <InfoRow label="Starts at">
-                                                <Text variant="bodySm" as="span">
-                                                    {new Date(lock.starts_at).toLocaleString()}
-                                                </Text>
-                                            </InfoRow>
-                                        )}
-                                        {lock.expires_at && (
-                                            <InfoRow label="Expires at">
-                                                <Text variant="bodySm" as="span">
-                                                    {new Date(lock.expires_at).toLocaleString()}
-                                                </Text>
-                                            </InfoRow>
-                                        )}
-                                    </BlockStack>
-                                </BlockStack>
-                            </Card>
+                                                    : <span className="sub">No items</span>}
+                                                {kindLabel && <span className="tag pro">{kindLabel}</span>}
+                                            </span>
+                                        </div>
+                                        <div className="kv"><span className="sub">Status</span><span className={`tag ${isActive ? 'live' : 'idle'}`}>{isActive ? 'Active' : 'Inactive'}</span></div>
+                                        <div className="kv"><span className="sub">Created</span><span>{fmtDateTime(lock.created_at)}</span></div>
+                                        <div className="kv"><span className="sub">Updated</span><span>{fmtDateTime(lock.updated_at)}</span></div>
+                                        <div className="kv"><span className="sub">Starts at</span><span>{lock.starts_at ? fmtDateTime(lock.starts_at) : '—'}</span></div>
+                                        <div className="kv"><span className="sub">Expires at</span><span>{lock.expires_at ? fmtDateTime(lock.expires_at) : '—'}</span></div>
+                                    </div>
+                                </div>
 
-                            {/* Widget info */}
-                            <Card>
-                                <BlockStack gap="400">
-                                    <Text variant="headingMd" as="h2">
-                                        Widget
-                                    </Text>
-                                    <Divider />
-                                    {widget ? (
-                                        <BlockStack gap="200">
-                                            <InfoRow label="Name">
-                                                <Text variant="bodySm" fontWeight="semibold" as="span">
-                                                    {widget.name}
-                                                </Text>
-                                            </InfoRow>
-                                            <InfoRow label="Type">
-                                                <Text variant="bodySm" as="span">
-                                                    {widget.type}
-                                                </Text>
-                                            </InfoRow>
-                                        </BlockStack>
-                                    ) : (
-                                        <Text tone="subdued" variant="bodySm">
-                                            Using default design (no custom widget assigned).
-                                        </Text>
-                                    )}
-                                </BlockStack>
-                            </Card>
+                                <div className="sec">
+                                    <span className="sec-h">Summary</span>
+                                    <div className="mt12">
+                                        <div className="kv"><span className="sub">Rules</span><span>{accessRules.length}</span></div>
+                                        <div className="kv"><span className="sub">Active rules</span><span>{activeRules}</span></div>
+                                        <div className="kv"><span className="sub">Resources</span><span>{protects || '—'}</span></div>
+                                        <div className="kv">
+                                            <span className="sub">Widget</span>
+                                            <span>{widget ? widgetLine : 'Using default design (no custom widget assigned)'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                            {/* Quick stats */}
-                            <Card>
-                                <BlockStack gap="400">
-                                    <Text variant="headingMd" as="h2">
-                                        Summary
-                                    </Text>
-                                    <Divider />
-                                    <BlockStack gap="200">
-                                        <InfoRow label="Rules">
-                                            <Text variant="bodySm" fontWeight="semibold" as="span">
-                                                {accessRules.length}
-                                            </Text>
-                                        </InfoRow>
-                                        <InfoRow label="Active rules">
-                                            <Text variant="bodySm" fontWeight="semibold" as="span">
-                                                {accessRules.filter((r) => r.enabled).length}
-                                            </Text>
-                                        </InfoRow>
-                                        <InfoRow label="Resources">
-                                            <Text variant="bodySm" fontWeight="semibold" as="span">
-                                                {resourceTypes
-                                                    .map(({ type, count }) => resourceTypeLabel(type, count))
-                                                    .join(', ') || '—'}
-                                            </Text>
-                                        </InfoRow>
-                                    </BlockStack>
-                                </BlockStack>
-                            </Card>
+                            <StagePreview lock={lock} widget={widget} groups={firstGroups} />
+                        </div>
 
+                        <div className="work-foot">
+                            <button type="button" className="btn" onClick={() => router.visit('/locks')}>Back to locks</button>
                             {previewMode && (
-                                <Button
-                                    variant="primary"
-                                    fullWidth
-                                    onClick={() => router.visit(`/lock/${lock.id}/configure`)}
-                                >
-                                    Edit this lock
-                                </Button>
+                                <button type="button" className="btn primary" onClick={goEdit}>Edit lock</button>
                             )}
-                        </BlockStack>
-                    </InlineGrid>
-                </Layout.Section>
-            </Layout>
-        </Page>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
     );
 }

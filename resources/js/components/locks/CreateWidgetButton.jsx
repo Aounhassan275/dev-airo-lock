@@ -31,6 +31,9 @@ export default function CreateWidgetButton({
     onCreated,
     storeLocales = [],
     primaryLocale = '',
+    // Optional: (open) => node. Lets a screen draw its own trigger (the lock
+    // builder's "+ Create widget" tile) while keeping this editor and flow.
+    renderTrigger = null,
 }) {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState('');
@@ -85,9 +88,13 @@ export default function CreateWidgetButton({
 
     return (
         <>
-            <Button icon={PlusIcon} variant="plain" onClick={() => setOpen(true)}>
-                Create widget
-            </Button>
+            {renderTrigger ? (
+                renderTrigger(() => setOpen(true))
+            ) : (
+                <Button icon={PlusIcon} variant="plain" onClick={() => setOpen(true)}>
+                    Create widget
+                </Button>
+            )}
 
             <Modal id={`create-${type}-widget-from-lock`} open={open} variant="max">
                 <TitleBar title={`Create a ${label}`}>

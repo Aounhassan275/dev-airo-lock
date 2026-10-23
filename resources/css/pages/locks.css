@@ -1,0 +1,117 @@
+/* Lock list (/locks). Every selector is scoped to .pg-locks because every
+   page's CSS is loaded on every page. */
+
+/* Plan and usage, on a card like every other card. */
+.pg-locks .plan {
+    display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+    padding: 15px 18px; margin-bottom: 14px;
+    border: 1px solid var(--p-border); border-radius: 14px; background: #fff;
+    box-shadow: var(--p-card-shadow);
+}
+.pg-locks .plan-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 7px; background: var(--accent); color: #fff;
+    flex: none; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pg-locks .plan-who { margin-left: -12px; min-width: 0; max-width: 420px; }
+.pg-locks .plan-name { display: block; font-size: 13px; font-weight: 650; }
+.pg-locks .plan-sub { display: block; font-size: 12px; color: var(--p-text-sub); margin-top: 1px; }
+.pg-locks .plan-meter { flex: 1; min-width: 240px; }
+.pg-locks .plan-bar { height: 6px; border-radius: 20px; background: #e3e3e3; overflow: hidden; }
+.pg-locks .plan-bar > i { display: block; height: 100%; border-radius: 20px; background: var(--accent); }
+.pg-locks .plan.limit .plan-bar > i { background: var(--p-critical-fg); }
+.pg-locks .plan.limit .plan-badge { background: var(--p-critical-fg); }
+.pg-locks .plan-x { color: var(--p-text-disabled); }
+
+/* One summary of one store, so one card — divided, not scattered. */
+.pg-locks .stat-row {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    background: #fff; border: 1px solid var(--p-border-soft); border-radius: 12px;
+    box-shadow: var(--p-card-shadow); overflow: hidden;
+}
+.pg-locks .stat-row.three { grid-template-columns: repeat(3, 1fr); }
+
+/* Narrower than its columns, the table scrolls rather than hiding the end
+   of every row behind the card's edge. */
+.pg-locks .t-scroll { overflow-x: auto; }
+.pg-locks .t-scroll .idx { min-width: 1000px; }
+@media (min-width: 1200px) { .pg-locks .t-scroll .idx { min-width: 0; } }
+
+.pg-locks .act-bar { display: block; height: 4px; border-radius: 20px; background: #e9e9e9; }
+.pg-locks .act-bar > i { display: block; height: 100%; border-radius: 20px; background: var(--p-success-fg); }
+.pg-locks .th-note { font-weight: 450; color: var(--p-text-disabled); margin-left: 5px; }
+
+/* A search box takes what it needs, not what the row has left over. */
+.pg-locks .filters .searchbar { max-width: 420px; flex: 1 1 268px; }
+.pg-locks .searchbar input {
+    border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px;
+    width: 100%; min-width: 0; color: var(--p-text); padding: 0; box-shadow: none;
+}
+.pg-locks .searchbar input::-webkit-search-cancel-button { cursor: pointer; }
+.pg-locks .filters .select { width: auto; }
+
+/* The bulk row replaces the filters while a selection exists. */
+.pg-locks .bulk {
+    display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+    border-bottom: 1px solid var(--p-border-soft); background: var(--v-50);
+}
+
+.pg-locks .t-none td { padding: 34px 16px; text-align: center; }
+.pg-locks .idx input[type="checkbox"] { cursor: pointer; }
+.pg-locks .lock-name {
+    color: var(--p-text); background: none; border: 0; padding: 0; font: inherit;
+    font-weight: 600; cursor: pointer; text-align: left;
+}
+.pg-locks .lock-name:hover { text-decoration: underline; }
+.pg-locks .knob[disabled] { opacity: .5; cursor: not-allowed; }
+.pg-locks .btn.icon.del:hover { color: var(--p-critical-fg); background: var(--p-critical-bg); }
+
+.pg-locks .pager {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 12px; border-top: 1px solid var(--p-border-soft);
+}
+
+/* Inside one card the stat cells lose the border, radius and shadow that
+   app.css gives a free-standing .stat. */
+.pg-locks .stat-row .stat {
+    border: 0; border-radius: 0; box-shadow: none; background: transparent;
+    padding: 13px 16px; display: flex; align-items: center; gap: 12px;
+}
+.pg-locks .stat-row .stat:hover { border-color: transparent; box-shadow: none; }
+.pg-locks .stat-row .stat + .stat { border-left: 1px solid var(--p-border-soft); }
+.pg-locks .stat-ico {
+    width: 32px; height: 32px; border-radius: 9px; background: #f1f1f1;
+    border: 0; display: grid; place-items: center; flex: none; color: var(--ink-1);
+}
+.pg-locks .stat-ico svg { width: 17px; height: 17px; }
+.pg-locks .stat-ico.good { background: var(--p-success-bg); color: var(--p-success-fg); }
+.pg-locks .stat-ico.warn { background: var(--p-warning-bg); color: var(--p-warning-fg); }
+.pg-locks .stat-ico.info { background: var(--p-info-bg); color: var(--p-info-fg); }
+.pg-locks .stat-ico.brand { background: var(--v-100); color: var(--v-800); }
+
+.pg-locks .stat-v { font-size: 21px; font-weight: 700; line-height: 25px; display: block;
+                    letter-spacing: -.015em; color: var(--p-text); }
+.pg-locks .stat-l { display: block; font-size: 12.5px; font-weight: 550; color: var(--p-text); }
+.pg-locks .stat-note { display: block; font-size: 11.5px; color: var(--p-text-sub); margin-top: 2px; }
+
+@media (max-width: 760px) {
+    .pg-locks .filters { flex-wrap: wrap; }
+    .pg-locks .filters .tabs { order: 1; }
+    .pg-locks .filters .select { order: 2; margin-left: auto; }
+    .pg-locks .filters .searchbar { order: 3; flex: 1 0 100%; max-width: none; }
+    .pg-locks .bulk { flex-wrap: wrap; }
+}
+@media (max-width: 1180px) { .pg-locks .stat-note { display: none; } }
+@media (max-width: 900px) {
+    .pg-locks .stat-row,
+    .pg-locks .stat-row.three { grid-template-columns: repeat(2, 1fr); }
+    .pg-locks .stat-row .stat:nth-child(3) { border-left: 0; }
+    .pg-locks .stat-row .stat:nth-child(n+3) { border-top: 1px solid var(--p-border-soft); }
+    .pg-locks .plan { gap: 12px 14px; }
+    .pg-locks .plan-who { margin-left: 0; flex: 1; }
+    .pg-locks .plan-meter { min-width: 100%; order: 3; }
+    .pg-locks .plan .btn.go { order: 4; width: 100%; text-align: center; }
+}
+@media (max-width: 700px) {
+    .pg-locks .stat-row .stat { padding: 12px 13px; gap: 11px; }
+}

@@ -1,62 +1,21 @@
-import { router, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { SaveBar, useAppBridge } from '@shopify/app-bridge-react';
 import {
     ActionList,
-    Autocomplete,
     Badge,
-    Banner,
     BlockStack,
-    Box,
     Button,
-    Card,
     Checkbox,
-    Collapsible,
-    Divider,
-    FormLayout,
-    Frame,
     Icon,
-    Image,
-    InlineGrid,
     InlineStack,
-    Layout,
     Modal,
-    Page,
-    Pagination,
     Popover,
-    Select,
-    Spinner,
     Tag,
     Text,
-    TextField,
 } from '@shopify/polaris';
-import {
-    BlogIcon,
-    CalendarIcon,
-    ChevronDownIcon,
-    ChevronUpIcon,
-    ClockIcon,
-    CodeIcon,
-    CollectionIcon,
-    DesktopIcon,
-    DuplicateIcon,
-    EmailIcon,
-    FilterIcon,
-    GlobeIcon,
-    HashtagIcon,
-    InfoIcon,
-    KeyIcon,
-    LinkIcon,
-    PageIcon,
-    PersonIcon,
-    ProductIcon,
-    SearchIcon,
-    StoreIcon,
-    XIcon,
-    RefreshIcon,
-} from '@shopify/polaris-icons';
+import { ChevronDownIcon, ChevronUpIcon, FilterIcon } from '@shopify/polaris-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import KnobToggle from '../../components/KnobToggle';
-import { goToPricing, optionSuffix, PlanBadge, usePlanGate } from '../../components/locks/planGate';
+import { usePlanGate } from '../../components/locks/planGate';
 import {
     CONTENT_TYPE_BY_RESOURCE,
     RESOURCE_TYPE_BY_CONTENT,
@@ -65,462 +24,14 @@ import {
     selectionId,
     storeItem,
 } from '../../lib/lockItems';
-import CredentialPairField from '../../components/locks/CredentialPairField';
-import CreateWidgetButton from '../../components/locks/CreateWidgetButton';
-import PopupTextModal from '../../components/locks/PopupTextModal';
-import PasscodeListField from '../../components/locks/PasscodeListField';
+import { CONDITION_TYPES, getRequiredWidgetTypes } from '../../components/locks/conditionTypes';
+import { useEmbedStatus } from '../../components/locks/EmbedStatus';
+import ItemPickerModal from '../../components/locks/ItemPickerModal';
+import LockBuilderForm from '../../components/locks/LockBuilderForm';
+import '../../../css/pages/lock-builder.css';
 
-// ===== CONDITION TYPES =====
-const CONDITION_TYPES = [
-    { label: 'If user is tagged with...', value: 'tag', icon: HashtagIcon },
-    { label: 'If user is signed in', value: 'signedIn', icon: PersonIcon },
-    { label: 'If user gives the passcode...', value: 'singlePasscode', icon: KeyIcon },
-    { label: 'If user gives one of many passcodes...', value: 'multiplePasscodes', icon: LinkIcon },
-    { label: 'If user arrives via a secret link...', value: 'singleSecretLink', icon: LinkIcon },
-    { label: 'If user is visiting from a certain location', value: 'location', icon: GlobeIcon },
-    { label: 'If user has a certain email address', value: 'specificEmail', icon: EmailIcon },
-    { label: 'If user email address contains...', value: 'emailContains', icon: EmailIcon },
-    { label: 'If user email is on a list...', value: 'emailFromList', icon: EmailIcon },
-    { label: 'If user gives the passcode issued to their email...', value: 'pairedCredentials', icon: KeyIcon },
-    { label: 'If user has a certain IP address', value: 'ip', icon: DesktopIcon },
-    { label: 'If user confirms their age...', value: 'ageVerification', icon: PersonIcon },
-];
-
-// Condition types enforceable at checkout (see extensions/airo-lock-checkout-block
-// and airo-lock-checkout-validation): buyer identity (sign-in, email), shipping
-// address (location) and the checkout access-code field (passcodes). Tags, IP,
-// secret links and age verification have no checkout signal — offering them
-// would create locks that either block everyone or silently never enforce.
-const CHECKOUT_CONDITION_TYPES = new Set(['signedIn', 'singlePasscode', 'multiplePasscodes', 'specificEmail', 'emailContains', 'emailFromList', 'pairedCredentials', 'location']);
-
-// Conditions that require user input at runtime → use Form Widget
-const FORM_BASED_CONDITIONS = new Set(['singlePasscode', 'multiplePasscodes', 'ageVerification', 'pairedCredentials']);
-
-// Returns which widget types the current condition groups require
-const getRequiredWidgetTypes = (groups = []) => {
-    let needsForm = false;
-    let needsText = false;
-    for (const group of groups) {
-        for (const cond of group?.conditions || []) {
-            if (!cond?.type) continue;
-            if (FORM_BASED_CONDITIONS.has(cond.type)) needsForm = true;
-            else needsText = true;
-        }
-    }
-    return { needsForm, needsText };
-};
-
-const USER_STATE_OPTIONS = [
-    { label: 'Logged-in customers', value: 'loggedIn' },
-    { label: 'Guests', value: 'guest' },
-];
-
-const COUNTRY_OPTIONS = [
-    { label: 'Afghanistan', value: 'AF' },
-    { label: 'Albania', value: 'AL' },
-    { label: 'Algeria', value: 'DZ' },
-    { label: 'Argentina', value: 'AR' },
-    { label: 'Australia', value: 'AU' },
-    { label: 'Austria', value: 'AT' },
-    { label: 'Bangladesh', value: 'BD' },
-    { label: 'Belgium', value: 'BE' },
-    { label: 'Brazil', value: 'BR' },
-    { label: 'Canada', value: 'CA' },
-    { label: 'China', value: 'CN' },
-    { label: 'Denmark', value: 'DK' },
-    { label: 'Egypt', value: 'EG' },
-    { label: 'Finland', value: 'FI' },
-    { label: 'France', value: 'FR' },
-    { label: 'Germany', value: 'DE' },
-    { label: 'Greece', value: 'GR' },
-    { label: 'India', value: 'IN' },
-    { label: 'Indonesia', value: 'ID' },
-    { label: 'Iran', value: 'IR' },
-    { label: 'Iraq', value: 'IQ' },
-    { label: 'Ireland', value: 'IE' },
-    { label: 'Italy', value: 'IT' },
-    { label: 'Japan', value: 'JP' },
-    { label: 'Malaysia', value: 'MY' },
-    { label: 'Mexico', value: 'MX' },
-    { label: 'Netherlands', value: 'NL' },
-    { label: 'New Zealand', value: 'NZ' },
-    { label: 'Nigeria', value: 'NG' },
-    { label: 'Norway', value: 'NO' },
-    { label: 'Pakistan', value: 'PK' },
-    { label: 'Philippines', value: 'PH' },
-    { label: 'Poland', value: 'PL' },
-    { label: 'Portugal', value: 'PT' },
-    { label: 'Russia', value: 'RU' },
-    { label: 'Saudi Arabia', value: 'SA' },
-    { label: 'Singapore', value: 'SG' },
-    { label: 'South Africa', value: 'ZA' },
-    { label: 'South Korea', value: 'KR' },
-    { label: 'Spain', value: 'ES' },
-    { label: 'Sweden', value: 'SE' },
-    { label: 'Switzerland', value: 'CH' },
-    { label: 'Thailand', value: 'TH' },
-    { label: 'Turkey', value: 'TR' },
-    { label: 'United Arab Emirates', value: 'AE' },
-    { label: 'United Kingdom', value: 'GB' },
-    { label: 'United States', value: 'US' },
-    { label: 'Vietnam', value: 'VN' },
-    { label: 'Custom…', value: 'custom' },
-];
-
-// ===== HELPER COMPONENTS =====
-function LocationConditionInput({ condition, onChange }) {
-    const [inputValue, setInputValue] = useState('');
-    const [options, setOptions] = useState(COUNTRY_OPTIONS);
-
-    // Get selected country label
-    const selectedCountry = COUNTRY_OPTIONS.find((c) => c.value === condition.value);
-    const selectedLabel = selectedCountry ? selectedCountry.label : '';
-
-    const updateText = useCallback(
-        (value) => {
-            setInputValue(value);
-
-            if (value === '') {
-                setOptions(COUNTRY_OPTIONS);
-                return;
-            }
-
-            const filterRegex = new RegExp(value, 'i');
-            const resultOptions = COUNTRY_OPTIONS.filter((option) => option.label.match(filterRegex));
-            setOptions(resultOptions);
-        },
-        [],
-    );
-
-    const updateSelection = useCallback(
-        (selected) => {
-            const selectedValue = selected[0];
-            const selectedOption = COUNTRY_OPTIONS.find((option) => option.value === selectedValue);
-            
-            if (selectedOption) {
-                // Update the condition value to the country code
-                onChange({ value: selectedValue });
-                setInputValue(selectedOption.label);
-            }
-        },
-        [onChange],
-    );
-
-    const textField = (
-        <Autocomplete.TextField
-            onChange={updateText}
-            label="Country"
-            value={inputValue || selectedLabel}
-            placeholder="Search countries..."
-            autoComplete="off"
-        />
-    );
-
-    return (
-        <BlockStack gap="200">
-            <Autocomplete
-                options={options}
-                selected={condition.value ? [condition.value] : []}
-                onSelect={updateSelection}
-                textField={textField}
-            />
-            {condition.value === 'custom' && (
-                <TextField
-                    label="Custom location"
-                    value={condition.custom || ''}
-                    onChange={(v) => onChange({ custom: v })}
-                    autoComplete="off"
-                    placeholder="e.g., New York, London, EU"
-                />
-            )}
-        </BlockStack>
-    );
-}
-
-function ConditionRow({ condition, onChange, onRemove, index, usedTypes = [], checkoutMode = false }) {
-    const setField = useCallback((key, value) => onChange({ ...condition, [key]: value }), [condition, onChange]);
-    const { conditionTier } = usePlanGate();
-    const { store, auth } = usePage().props;
-
-    const ConditionIcon = CONDITION_TYPES.find((t) => t.value === condition.type)?.icon || InfoIcon;
-
-    const selectOptions = useMemo(() => {
-        // Plan-gated types stay visible (with their tier suffix) but can't be picked.
-        const options = CONDITION_TYPES
-            .filter(({ value }) => value === condition.type || (!usedTypes.includes(value) && (!checkoutMode || CHECKOUT_CONDITION_TYPES.has(value))))
-            .map(({ label, value }) => {
-                const tier = conditionTier(value);
-
-                return { label: label + optionSuffix(tier), value, disabled: !!tier && value !== condition.type };
-            });
-        if (!condition.type) {
-            options.unshift({ label: 'Select condition type...', value: '' });
-        }
-        return options;
-    }, [condition.type, usedTypes, conditionTier, checkoutMode]);
-
-    const conditionSpecificInput = useMemo(() => {
-        switch (condition.type) {
-            case 'tag':
-                return (
-                    <TextField
-                        label="Customer tag"
-                        value={condition.value || ''}
-                        onChange={(v) => setField('value', v)}
-                        autoComplete="off"
-                        placeholder="e.g., VIP, B2B"
-                        helpText="Customers must have this tag applied to their account"
-                    />
-                );
-            case 'signedIn':
-                return (
-                    <Select
-                        label="Customer state"
-                        options={USER_STATE_OPTIONS}
-                        value={condition.value || 'loggedIn'}
-                        onChange={(v) => setField('value', v)}
-                        helpText="Check if customer is signed in or not"
-                    />
-                );
-            case 'singlePasscode':
-                return (
-                    <TextField
-                        label="Passcode"
-                        value={condition.value || ''}
-                        onChange={(v) => setField('value', v)}
-                        autoComplete="off"
-                        placeholder='e.g., "123"'
-                        helpText="The exact passcode customers must enter"
-                    />
-                );
-            case 'multiplePasscodes':
-                return (
-                    <PasscodeListField
-                        label="Multiple passcodes"
-                        value={condition.value || ''}
-                        onChange={(v) => setField('value', v)}
-                        placeholder="e.g., 1234"
-                        helpText='Customers can use any of these passcodes. Use "Add in bulk" to paste or upload a whole list at once.'
-                    />
-                );
-            case 'singleSecretLink': {
-                const secretCode = (condition.value || '').trim();
-                // Store has no `domain` column — `url` holds the primary domain
-                // (https://…); the shop's myshopify domain (users.name) is the fallback.
-                const storefrontBase =
-                    (store?.url || '').replace(/\/+$/, '') || (auth?.user?.name ? `https://${auth.user.name}` : '');
-                const secretLink = secretCode && storefrontBase
-                    ? `${storefrontBase}/?access=${encodeURIComponent(secretCode)}`
-                    : '';
-                return (
-                    <FormLayout>
-                        <TextField
-                            label="Secret link code"
-                            value={condition.value || ''}
-                            onChange={(v) => setField('value', v)}
-                            autoComplete="off"
-                            placeholder="e.g., summer-sale-2024"
-                            helpText="Customers must arrive via a link carrying this code"
-                        />
-                        {secretLink ? (
-                            <TextField
-                                label="Shareable secret link"
-                                value={secretLink}
-                                readOnly
-                                autoComplete="off"
-                                connectedRight={
-                                    <Button onClick={() => navigator.clipboard?.writeText(secretLink)}>
-                                        Copy
-                                    </Button>
-                                }
-                                helpText="Send this to customers — opening it unlocks the locked content for their browsing session. You can also append ?access=CODE to any page or product link."
-                            />
-                        ) : null}
-                    </FormLayout>
-                );
-            }
-            case 'location':
-                return (
-                    <LocationConditionInput
-                        condition={condition}
-                        onChange={(updates) => onChange({ ...condition, ...updates })}
-                    />
-                );
-            case 'specificEmail':
-                return (
-                    <TextField
-                        label="Email address"
-                        value={condition.value || ''}
-                        onChange={(v) => setField('value', v)}
-                        autoComplete="off"
-                        placeholder="e.g., customer@example.com"
-                        helpText="Exact email address required"
-                    />
-                );
-            case 'emailContains':
-                return (
-                    <TextField
-                        label="Email contains"
-                        value={condition.value || ''}
-                        onChange={(v) => setField('value', v)}
-                        autoComplete="off"
-                        placeholder="e.g., @company.com"
-                        helpText="Email address must contain this text"
-                    />
-                );
-            case 'pairedCredentials':
-                return (
-                    <CredentialPairField
-                        value={condition.value || ''}
-                        onChange={(v) => setField('value', v)}
-                        helpText={'Each passcode works only for the email address next to it. A customer enters both, and a code issued to someone else will not let them in.'}
-                    />
-                );
-            case 'emailFromList':
-                return (
-                    <PasscodeListField
-                        label="Allowed email addresses"
-                        value={condition.value || ''}
-                        onChange={(v) => setField('value', v)}
-                        kind="email"
-                        itemLabel="Email"
-                        addLabel="Add another email"
-                        placeholder="e.g., customer@example.com"
-                        helpText='Anyone on this list gets in. Use "Add in bulk" to paste or upload a whole customer list at once.'
-                    />
-                );
-            case 'ip':
-                return (
-                    <TextField
-                        label="IP address (IPv4/IPv6)"
-                        value={condition.value || ''}
-                        onChange={(v) => setField('value', v)}
-                        autoComplete="off"
-                        placeholder="e.g., 203.0.113.42"
-                        helpText="Only allow access from specific IP addresses"
-                    />
-                );
-            case 'ageVerification':
-                return (
-                    <BlockStack gap="200">
-                        <Select
-                            label="Minimum age required"
-                            options={[
-                                { label: '18 years old', value: '18' },
-                                { label: '21 years old', value: '21' },
-                                { label: '25 years old', value: '25' },
-                            ]}
-                            value={condition.value || '18'}
-                            onChange={(v) => setField('value', v)}
-                            helpText="Visitors must confirm they meet the minimum age requirement"
-                        />
-                    </BlockStack>
-                );
-            default:
-                return <Text tone="subdued">Select a condition type to configure it.</Text>;
-        }
-    }, [condition, setField]);
-
-    return (
-        <Card padding="400">
-            <BlockStack gap="400">
-                <InlineStack align="space-between" blockAlign="center">
-                    <InlineStack gap="200" blockAlign="center">
-                        <Icon source={ConditionIcon} tone="subdued" />
-                        <Text as="span" variant="bodyMd" fontWeight="medium">
-                            Condition {index + 1}
-                        </Text>
-                        <Badge tone="info">Permit if</Badge>
-                        <PlanBadge tier={conditionTier(condition.type)} />
-                    </InlineStack>
-                    <Button tone="critical" variant="plain" onClick={onRemove}>
-                        Remove
-                    </Button>
-                </InlineStack>
-
-                <FormLayout>
-                    {/* Reset value/custom on type change — carrying them over saves e.g.
-                        {type:'signedIn', value:'1234'} which no visitor can ever pass. */}
-                    <Select
-                        label="Condition type"
-                        options={selectOptions}
-                        value={condition.type}
-                        onChange={(v) => onChange({ ...condition, type: v, value: '', custom: undefined })}
-                    />
-                    {conditionSpecificInput}
-                </FormLayout>
-            </BlockStack>
-        </Card>
-    );
-}
-
-function ConditionGroup({ group, onChange, onAddCondition, checkoutMode = false }) {
-    const setGroupField = useCallback((key, value) => onChange({ ...group, [key]: value }), [group, onChange]);
-
-    const updateCondition = useCallback(
-        (idx, updated) => {
-            const next = [...group.conditions];
-            next[idx] = updated;
-            setGroupField('conditions', next);
-        },
-        [group.conditions, setGroupField],
-    );
-
-    const removeCondition = useCallback(
-        (idx) => {
-            const next = group.conditions.filter((_, i) => i !== idx);
-            setGroupField('conditions', next);
-        },
-        [group.conditions, setGroupField],
-    );
-
-    return (
-        <BlockStack gap="400">
-            <InlineStack align="space-between" blockAlign="center">
-                <Text as="span" tone="subdued">
-                    {group.conditions.length} condition{group.conditions.length !== 1 ? 's' : ''}
-                </Text>
-                <Select
-                    label="Operator"
-                    labelHidden
-                    options={[
-                        { label: 'AND (all must match)', value: 'AND' },
-                        { label: 'OR (any can match)', value: 'OR' },
-                    ]}
-                    value={group.operator}
-                    onChange={(v) => setGroupField('operator', v)}
-                />
-            </InlineStack>
-            <Text as="p" variant="bodySm" tone="subdued">
-                Customer must meet {group.operator === 'AND' ? 'all' : 'any'} of the conditions below to unlock access.
-            </Text>
-            {group.conditions.map((c, idx) => {
-                const usedTypes = group.conditions
-                    .filter((_, i) => i !== idx)
-                    .map((cond) => cond.type)
-                    .filter(Boolean);
-                return (
-                    <ConditionRow
-                        key={idx}
-                        condition={c}
-                        onChange={(updated) => updateCondition(idx, updated)}
-                        onRemove={() => removeCondition(idx)}
-                        index={idx}
-                        usedTypes={usedTypes}
-                        checkoutMode={checkoutMode}
-                    />
-                );
-            })}
-            <Button
-                onClick={onAddCondition}
-                variant="plain"
-                disabled={group.conditions.filter((c) => c.type).length >= CONDITION_TYPES.length}
-            >
-                + Add condition
-            </Button>
-        </BlockStack>
-    );
-}
+// The condition types, their inputs and the widget-kind rule live in
+// components/locks/conditionTypes.jsx, shared with LockCreationFlow.jsx.
 
 // ===== INITIAL STATE VALUES =====
 const getInitialLockConfig = (existingLock = null) => ({
@@ -601,7 +112,6 @@ const LockCreationEdit = ({
     const [activeFilters, setActiveFilters] = useState([]);
     const [filterPopoverActive, setFilterPopoverActive] = useState(false);
     const [filterDropdownActive, setFilterDropdownActive] = useState({});
-    const [contentTypePopoverActive, setContentTypePopoverActive] = useState(false);
     const [expandedVariantProduct, setExpandedVariantProduct] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
@@ -835,27 +345,7 @@ const LockCreationEdit = ({
 
     const itemsPerPage = 50;
 
-    const contentTypeIcons = {
-        products: ProductIcon,
-        collections: CollectionIcon,
-        pages: PageIcon,
-        blogs: BlogIcon,
-        store: StoreIcon,
-        themes: CodeIcon,
-        variants: DuplicateIcon,
-        checkout: StoreIcon,
-    };
-
-    const contentTypes = [
-        { label: 'Products', value: 'products', icon: ProductIcon },
-        { label: 'Collections', value: 'collections', icon: CollectionIcon },
-        { label: 'Pages', value: 'pages', icon: PageIcon },
-        { label: 'Blogs', value: 'blogs', icon: BlogIcon },
-        { label: 'Entire Store', value: 'store', icon: StoreIcon },
-        { label: 'Liquid Theme', value: 'themes', icon: CodeIcon },
-        { label: 'Checkout (Plus)', value: 'checkout', icon: StoreIcon },
-        { label: 'Hide Price Rule', value: 'price_hide', icon: ProductIcon },
-    ];
+    // The content-type tiles (labels, icons) are drawn by components/locks/LockBuilderForm.jsx.
 
     // Plan badges ("Pro"/"Unlimited") on gated options — display only,
     // enforcement is server-side.
@@ -1455,7 +945,7 @@ const LockCreationEdit = ({
                             // The real reason arrives in the redirect URL (?save_error=…)
                             // because session flash is unreliable in the embedded iframe.
                             const path = (page.url || '').split('?')[0];
-                            if (path !== '/') {
+                            if (path !== '/locks') {
                                 const params = new URLSearchParams((page.url || '').split('?')[1] || '');
                                 const pageErrors = page.props?.errors || {};
                                 const message = params.get('save_error')
@@ -1469,7 +959,7 @@ const LockCreationEdit = ({
                             }
                             setIsDirty(false);
                             showToast('Price rule updated successfully');
-                            setTimeout(() => router.visit('/'), 100);
+                            setTimeout(() => router.visit('/locks'), 100);
                         },
                         onError: (errors) => {
                             // Reset on error so SaveBar can show again
@@ -1528,7 +1018,7 @@ const LockCreationEdit = ({
                         // The real reason arrives in the redirect URL (?save_error=…)
                         // because session flash is unreliable in the embedded iframe.
                         const path = (page.url || '').split('?')[0];
-                        if (path !== '/') {
+                        if (path !== '/locks') {
                             const params = new URLSearchParams((page.url || '').split('?')[1] || '');
                             const pageErrors = page.props?.errors || {};
                             const message = params.get('save_error')
@@ -1542,7 +1032,7 @@ const LockCreationEdit = ({
                         }
                         setIsDirty(false);
                         showToast('Lock updated successfully');
-                        setTimeout(() => router.visit('/'), 100);
+                        setTimeout(() => router.visit('/locks'), 100);
                     },
                     onError: (errors) => {
                         // Reset on error so SaveBar can show again
@@ -1670,87 +1160,6 @@ const LockCreationEdit = ({
         );
     };
 
-    const renderSelectedItemsPreview = () => {
-        if (lockConfig.selectedItems.length === 0 && unmatchedRules.length === 0) return null;
-        const lists = itemListsByType({ products, collections, pages, blogs, themes, variants, store });
-
-        return (
-            <Card>
-                <BlockStack gap="300">
-                    <InlineStack align="space-between" blockAlign="center">
-                        <Text variant="bodyMd" fontWeight="medium">
-                            Selected Items
-                        </Text>
-                        <InlineStack gap="200">
-                            <Button onClick={() => setSelectionModalActive(true)} size="slim" variant="tertiary">
-                                Change
-                            </Button>
-                            <Button onClick={() => updateLockConfig({ selectedItems: [] })} plain tone="critical" icon={XIcon} size="slim">
-                                Clear all
-                            </Button>
-                        </InlineStack>
-                    </InlineStack>
-                    {selectedOverlaps.length > 0 && (
-                        <Banner tone="warning" title="Another active lock already covers some of these items">
-                            <p>
-                                Only one lock is enforced per item — the one saved most recently (a custom widget design takes priority).
-                                {' '}{selectedOverlaps.slice(0, 3).map((o) => `${o.title} is also locked by "${o.lockName}"`).join('; ')}
-                                {selectedOverlaps.length > 3 ? `; and ${selectedOverlaps.length - 3} more` : ''}.
-                            </p>
-                        </Banner>
-                    )}
-                    {unmatchedRules.length > 0 && (
-                        <Banner tone="warning" title="Some items on this lock can't be shown here">
-                            <p>
-                                {unmatchedRules.length} locked item{unmatchedRules.length !== 1 ? 's' : ''} (
-                                {unmatchedRules.slice(0, 3).map((r) => r.handle || r.resource_type).join(', ')}
-                                {unmatchedRules.length > 3 ? `, and ${unmatchedRules.length - 3} more` : ''}
-                                ) {unmatchedRules.length !== 1 ? 'are' : 'is'} not in your synced catalog — renamed in Shopify, or not synced yet.
-                                {' '}They stay locked and are kept when you save.
-                            </p>
-                        </Banner>
-                    )}
-                    <BlockStack gap="200">
-                        {lockConfig.selectedItems.slice(0, 3).map((selId) => {
-                            const type = selId.slice(0, selId.indexOf('-'));
-                            const item = findBySelectionId(lists[type], type, selId);
-                            if (!item) return null;
-                            return (
-                                <div key={selId} className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2 px-3">
-                                    <InlineStack align="center" gap="300">
-                                        {type === 'products' && item.image_url ? (
-                                            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded bg-gray-100">
-                                                <Image source={item.image_url} alt={item.title || item.name} className="h-full w-full object-cover" />
-                                            </div>
-                                        ) : (
-                                            <div className="flex h-10 w-10 items-center justify-center rounded bg-blue-50">
-                                                <Icon source={contentTypeIcons[type]} tone="success" />
-                                            </div>
-                                        )}
-                                        <BlockStack gap="050">
-                                            <Text variant="bodyMd" fontWeight="medium">
-                                                {item.title || item.name}
-                                            </Text>
-                                            <Text variant="bodySm" tone="subdued">
-                                                {type.charAt(0).toUpperCase() + type.slice(1)}
-                                            </Text>
-                                        </BlockStack>
-                                    </InlineStack>
-                                    <Button onClick={() => handleItemToggle(selId)} plain tone="critical" icon={XIcon} size="slim" />
-                                </div>
-                            );
-                        })}
-                        {lockConfig.selectedItems.length > 3 && (
-                            <Text variant="bodySm" tone="subdued" alignment="center">
-                                + {lockConfig.selectedItems.length - 3} more items
-                            </Text>
-                        )}
-                    </BlockStack>
-                </BlockStack>
-            </Card>
-        );
-    };
-
     // Variant ids are stored as Shopify GIDs; the storefront matches the
     // numeric id, so persist the trailing numeric portion.
     const variantNumericId = (variant) => String(variant.variant_id || '').split('/').pop();
@@ -1764,72 +1173,68 @@ const LockCreationEdit = ({
         updateLockConfig({ variantSelections: current });
     };
 
-    // Per-product variant picker (5.4). Lets the merchant lock only specific
-    // variants. Leaving all unchecked keeps the rule product-wide.
-    const renderVariantPicker = () => {
-        if (lockConfig.selectedContentType !== 'products') return null;
-        const productSelIds = lockConfig.selectedItems.filter((s) => s.startsWith('products-'));
-        if (productSelIds.length === 0) return null;
+    // The selected row behind a selection id, for the selection bar and chips.
+    const resolveSelected = useCallback(
+        (selId) => {
+            const lists = itemListsByType({ products, collections, pages, blogs, themes, variants, store });
+            const type = selId.slice(0, selId.indexOf('-'));
+            return findBySelectionId(lists[type], type, selId) || null;
+        },
+        [products, collections, pages, blogs, themes, variants, store],
+    );
 
-        const rows = productSelIds
-            .map((selId) => {
-                const pid = selId.slice('products-'.length);
-                const product = products.find((p) => String(p.shopify_product_id) === String(pid));
-                const productVariants = variants.filter((v) => String(v.shopify_product_id) === String(pid));
-                if (!product || productVariants.length <= 1) return null;
-                const selected = (lockConfig.variantSelections && lockConfig.variantSelections[selId]) || [];
-                const open = expandedVariantProduct === selId;
-                return (
-                    <Box key={selId} padding="200" background="bg-surface-secondary" borderRadius="200">
-                        <BlockStack gap="200">
-                            <Button
-                                disclosure={open ? 'up' : 'down'}
-                                onClick={() => setExpandedVariantProduct(open ? null : selId)}
-                                fullWidth
-                                textAlign="left"
-                                variant="tertiary"
-                            >
-                                {`${product.title} — ${selected.length > 0 ? `${selected.length} variant(s) locked` : 'entire product'}`}
-                            </Button>
-                            <Collapsible open={open} id={`variant-picker-${selId}`}>
-                                <BlockStack gap="100">
-                                    {productVariants.map((v) => {
-                                        const vid = variantNumericId(v);
-                                        return (
-                                            <Checkbox
-                                                key={vid}
-                                                label={v.title}
-                                                checked={selected.includes(vid)}
-                                                onChange={(checked) => toggleVariant(selId, vid, checked)}
-                                            />
-                                        );
-                                    })}
-                                </BlockStack>
-                            </Collapsible>
-                        </BlockStack>
-                    </Box>
-                );
-            })
-            .filter(Boolean);
+    const embedStatus = useEmbedStatus();
+    const saveable = lockConfig.name.trim() !== '' && lockConfig.selectedItems.length > 0;
+    const lockKey = existingLock?.id || lock_id;
 
-        if (rows.length === 0) return null;
+    // Leaving: the contextual save bar outlives an Inertia visit, so it goes first.
+    const leave = useCallback(() => {
+        shopify?.saveBar?.hide('lock-save-bar').catch(() => { });
+        router.visit('/locks');
+    }, [shopify]);
 
-        return (
-            <Card>
-                <BlockStack gap="300">
-                    <Text variant="headingMd" as="h2">Lock specific variants (optional)</Text>
-                    <Text as="p" tone="subdued">
-                        Leave a product's variants unchecked to lock the whole product. Check variants to lock only those; behavior is controlled by the "Variant behavior" settings.
-                    </Text>
-                    <Divider />
-                    {rows}
-                </BlockStack>
-            </Card>
-        );
-    };
+    // ===== DELETE =====
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
+    const confirmDelete = useCallback(() => {
+        if (!lockKey || deleting) return;
+        setDeleting(true);
+        // Nothing on this page is worth keeping once the lock is gone.
+        saveSuccessRef.current = true;
+        shopify?.saveBar?.hide('lock-save-bar').catch(() => { });
+        const name = lockConfig.name || existingLock?.name || 'Lock';
+
+        // DELETE /locks/{lock} answers with back(). Sent from here, "back" is
+        // this lock's own page, which no longer exists once it is deleted — so
+        // go to the list first and make the request from there.
+        router.visit('/locks', {
+            onSuccess: () => {
+                router.delete(`/locks/${lockKey}`, {
+                    preserveScroll: true,
+                    onSuccess: () => showToast(`"${name}" deleted.`),
+                    onError: () => showToast('Failed to delete lock. Please try again.', { isError: true }),
+                });
+            },
+            onError: () => {
+                saveSuccessRef.current = false;
+                setDeleting(false);
+            },
+        });
+    }, [lockKey, deleting, shopify, lockConfig.name, existingLock, showToast]);
+
+    // The saved state, not the toggle: the badge says what the storefront is doing now.
+    const savedActive = getInitialEnabled(existingLock);
+    const statusBadge = !savedActive ? (
+        <span className="badge">Disabled</span>
+    ) : embedStatus.enabled === false ? (
+        <span className="badge warning">Not running yet</span>
+    ) : (
+        <span className="badge success">Running</span>
+    );
 
     return (
-        <Frame>
+        <>
             {/* SaveBar Component */}
             <SaveBar id="lock-save-bar">
                 <button variant="primary" onClick={handleSave} disabled={isSubmitting} loading={isSubmitting ? '' : undefined}>
@@ -1840,670 +1245,134 @@ const LockCreationEdit = ({
                 </button>
             </SaveBar>
 
-            <Page title={lockConfig.name || 'Edit lock'} backAction={{ content: 'Dashboard', onAction: () => router.visit('/') }}>
-                <Layout>
-                    <Layout.Section>
-                        <InlineGrid columns={{ xs: '1fr', md: '1fr 340px' }} gap="400">
-                            <BlockStack gap="400">
-                                <Card>
-                                    <BlockStack gap="400">
-                                        <InlineStack align="space-between" blockAlign="center">
-                                            <Text variant="headingMd" as="h2">
-                                                Lock information
-                                            </Text>
-                                            <Badge tone={enabled ? 'success' : 'attention'}>{enabled ? 'Enabled' : 'Disabled'}</Badge>
-                                        </InlineStack>
-                                        <TextField
-                                            label="Name"
-                                            value={lockConfig.name}
-                                            onChange={(value) => updateLockConfig({ name: value })}
-                                            autoComplete="off"
-                                            placeholder="Enter lock name"
-                                        />
-                                    </BlockStack>
-                                </Card>
+            <Modal
+                open={deleteOpen}
+                onClose={() => setDeleteOpen(false)}
+                title="Delete this lock?"
+                primaryAction={{
+                    content: 'Delete lock',
+                    destructive: true,
+                    loading: deleting,
+                    onAction: confirmDelete,
+                }}
+                secondaryActions={[{ content: 'Cancel', onAction: () => setDeleteOpen(false), disabled: deleting }]}
+            >
+                <Modal.Section>
+                    <Text as="p">
+                        The content it covers goes back to being open to everyone, straight away. This cannot be undone.
+                    </Text>
+                </Modal.Section>
+            </Modal>
 
-                                <Card>
-                                    <BlockStack gap="400">
-                                        <InlineStack align="space-between" blockAlign="center">
-                                            <Text variant="headingMd" as="h2">
-                                                Content to lock
-                                            </Text>
-                                            {lockConfig.selectedItems.length > 0 && (
-                                                <Badge tone="success">{lockConfig.selectedItems.length} selected</Badge>
-                                            )}
-                                        </InlineStack>
+            <LockBuilderForm
+                title={lockConfig.name || existingLock?.name || 'Edit lock'}
+                lockId={lockKey}
+                statusBadge={statusBadge}
+                saveLabel={isSubmitting ? 'Saving...' : 'Save'}
+                saveDisabled={isSubmitting || !saveable}
+                saveable={saveable}
+                onSave={handleSave}
+                onBack={leave}
+                onCancel={leave}
+                onDelete={lockKey ? () => setDeleteOpen(true) : null}
+                lockConfig={lockConfig}
+                updateLockConfig={updateLockConfig}
+                contentTypeTier={contentTypeTier}
+                onSelectContentType={handleContentTypeSelect}
+                resolveSelected={resolveSelected}
+                onOpenPicker={() => setSelectionModalActive(true)}
+                onClearItems={() => updateLockConfig({ selectedItems: [] })}
+                onRemoveItem={handleItemToggle}
+                selectedOverlaps={selectedOverlaps}
+                unmatchedRules={unmatchedRules}
+                products={products}
+                variants={variants}
+                expandedVariantProduct={expandedVariantProduct}
+                onExpandVariant={setExpandedVariantProduct}
+                onToggleVariant={toggleVariant}
+                variantNumericId={variantNumericId}
+                lockActionOptions={lockActionOptions}
+                lockActionHelp={LOCK_ACTION_HELP}
+                onLockAction={applyLockAction}
+                groups={groups}
+                onGroupChange={updateGroup}
+                onAddCondition={addConditionToGroup}
+                requiredWidgetTypes={requiredWidgetTypes}
+                formWidgets={formWidgets}
+                textWidgets={textWidgets}
+                storeLocales={storeLocales}
+                primaryLocale={primaryLocale}
+                enabled={enabled}
+                onEnabledChange={(checked) => {
+                    setEnabled(checked);
+                    markDirty();
+                }}
+                redirectUrl={redirectUrl}
+                onRedirectUrlChange={(value) => {
+                    setRedirectUrl(value);
+                    markDirty();
+                }}
+                onSeoBlockChange={(checked) => {
+                    updateLockConfig({ seoBlock: checked });
+                    markDirty();
+                }}
+                onLockedVariantDisplayChange={(value) => {
+                    updateLockConfig({ lockedVariantDisplay: value });
+                    markDirty();
+                }}
+                onAllVariantsLockedChange={(value) => {
+                    updateLockConfig({ allVariantsLockedBehavior: value });
+                    markDirty();
+                }}
+                schedulingTier={schedulingTier}
+                startDate={startDate}
+                startTime={startTime}
+                endDate={endDate}
+                endTime={endTime}
+                onStartDate={(value) => { setStartDate(value); markDirty(); }}
+                onStartTime={(value) => { setStartTime(value); markDirty(); }}
+                onEndDate={(value) => { setEndDate(value); markDirty(); }}
+                onEndTime={(value) => { setEndTime(value); markDirty(); }}
+                embedStatus={embedStatus}
+            />
 
-                                        <Popover
-                                            active={contentTypePopoverActive}
-                                            activator={
-                                                <Button onClick={() => setContentTypePopoverActive(true)} disclosure fullWidth textAlign="left">
-                                                    <InlineStack align="center" gap="200">
-                                                        <Icon
-                                                            source={
-                                                                lockConfig.selectedContentType
-                                                                    ? contentTypeIcons[lockConfig.selectedContentType] || ProductIcon
-                                                                    : ProductIcon
-                                                            }
-                                                        />
-                                                        <span>
-                                                            {lockConfig.selectedContentType
-                                                                ? lockConfig.lockType === 'price_hide'
-                                                                    ? 'Hide Price Rule'
-                                                                    : contentTypes.find((c) => c.value === lockConfig.selectedContentType)?.label
-                                                                : 'Begin typing to search – or select a resource type'}
-                                                        </span>
-                                                    </InlineStack>
-                                                </Button>
-                                            }
-                                            onClose={() => setContentTypePopoverActive(false)}
-                                            preferredAlignment="left"
-                                            fullWidth
-                                        >
-                                            <ActionList
-                                                items={contentTypes.map((type) => {
-                                                    const tier = contentTypeTier(type.value);
-
-                                                    return {
-                                                        content: type.label,
-                                                        icon: type.icon,
-                                                        suffix: <PlanBadge tier={tier} />,
-                                                        onAction: () => {
-                                                            setContentTypePopoverActive(false);
-                                                            // Plan-gated types can't be selected — send
-                                                            // the merchant to upgrade instead.
-                                                            if (tier) {
-                                                                goToPricing();
-                                                                return;
-                                                            }
-                                                            handleContentTypeSelect(type.value);
-                                                        },
-                                                    };
-                                                })}
-                                            />
-                                        </Popover>
-
-                                        {renderSelectedItemsPreview()}
-                                    </BlockStack>
-                                </Card>
-
-                                {renderVariantPicker()}
-
-                                {lockConfig.lockType !== 'price_hide' && lockConfig.selectedItems.length > 0 && (
-                                    <Card>
-                                        <BlockStack gap="400">
-                                            <Text variant="headingMd" as="h2">
-                                                Lock Conditions
-                                            </Text>
-                                            <Text as="p" tone="subdued">
-                                                Select condition to apply the lock
-                                            </Text>
-                                            <Divider />
-                                            {/* Hidden until feature is fully implemented
-                                            <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                                                <BlockStack gap="200">
-                                                    <Checkbox
-                                                        label="User request by email"
-                                                        checked={userRequestByEmail}
-                                                        onChange={(checked) => {
-                                                            setUserRequestByEmail(checked);
-                                                            markDirty();
-                                                        }}
-                                                        helpText="Allow users to request access by their email address"
-                                                    />
-                                                </BlockStack>
-                                            </Box>
-                                            */}
-
-                                            <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                                                <Select
-                                                    label="When locked, do this"
-                                                    options={lockActionOptions}
-                                                    value={lockConfig.lockAction}
-                                                    onChange={applyLockAction}
-                                                    helpText={LOCK_ACTION_HELP[lockConfig.lockAction] || ''}
-                                                />
-                                            </Box>
-
-                                            <Divider />
-                                            {groups.length > 0 && (
-                                                <ConditionGroup
-                                                    group={groups[0]}
-                                                    checkoutMode={lockConfig.selectedContentType === 'checkout'}
-                                                    onChange={(updated) => updateGroup(0, updated)}
-                                                    onAddCondition={() => addConditionToGroup(0)}
-                                                />
-                                            )}
-                                        </BlockStack>
-                                    </Card>
-                                )}
-
-                                {lockConfig.lockType === 'price_hide' && lockConfig.selectedItems.length > 0 && (
-                                    <Card>
-                                        <BlockStack gap="400">
-                                            <Text variant="headingMd" as="h2">
-                                                Price Visibility Settings
-                                            </Text>
-                                            <Divider />
-                                            <TextField
-                                                label="Price Hidden Message"
-                                                value={lockConfig.priceMessage}
-                                                onChange={(value) => updateLockConfig({ priceMessage: value })}
-                                                helpText="Message to display in place of the price"
-                                                autoComplete="off"
-                                                placeholder="Sign in to see price"
-                                            />
-                                            <Checkbox
-                                                label="Hide on all pages (Collections, Search, etc.)"
-                                                checked={lockConfig.hideOnAllPages}
-                                                onChange={(checked) => updateLockConfig({ hideOnAllPages: checked })}
-                                            />
-                                            <Checkbox
-                                                label="Disallow Add to Cart / Checkout"
-                                                checked={lockConfig.hideOnCheckout}
-                                                onChange={(checked) => updateLockConfig({ hideOnCheckout: checked })}
-                                                helpText="Hides 'Add to Cart' buttons and prevents checkout"
-                                            />
-                                        </BlockStack>
-                                    </Card>
-                                )}
-
-                            </BlockStack>
-
-                            <BlockStack gap="400">
-                                <Card>
-                                    <BlockStack gap="400">
-                                        <InlineStack align="space-between" blockAlign="center">
-                                            <Text variant="headingMd" as="h2">
-                                                Settings
-                                            </Text>
-                                            <KnobToggle
-                                                checked={enabled}
-                                                onChange={(checked) => {
-                                                    setEnabled(checked);
-                                                    markDirty();
-                                                }}
-                                            />
-                                        </InlineStack>
-                                        {lockConfig.lockType !== 'price_hide' && lockConfig.selectedItems.length > 0 && (
-                                            <>
-                                                <Divider />
-                                                <TextField
-                                                    label="Redirect URL (optional)"
-                                                    value={redirectUrl}
-                                                    onChange={(value) => {
-                                                        setRedirectUrl(value);
-                                                        markDirty();
-                                                    }}
-                                                    placeholder="https://example.com/access-granted"
-                                                    autoComplete="off"
-                                                    helpText="Where to redirect customers after successful authentication"
-                                                />
-                                                <Checkbox
-                                                    label="Hide from search engines"
-                                                    checked={lockConfig.seoBlock}
-                                                    onChange={(checked) => {
-                                                        updateLockConfig({ seoBlock: checked });
-                                                        markDirty();
-                                                    }}
-                                                    helpText="Adds a noindex meta tag so Googlebot won't index the locked page. Recommended for wholesale catalogs and confidential content."
-                                                />
-                                                <Divider />
-                                                <Text variant="headingSm" as="h3">
-                                                    How long access lasts
-                                                </Text>
-                                                <Select
-                                                    label="After a customer unlocks this"
-                                                    options={[
-                                                        { label: 'Stay unlocked on this device', value: 'remember' },
-                                                        { label: 'Ask again on their next visit', value: 'session' },
-                                                        { label: 'Ask again on every page', value: 'always' },
-                                                    ]}
-                                                    value={lockConfig.reprompt || 'remember'}
-                                                    onChange={(value) => updateLockConfig({ reprompt: value })}
-                                                    helpText={
-                                                        lockConfig.reprompt === 'always'
-                                                            ? 'Customers re-enter their details on every page, including a refresh. Use for sensitive content; it is deliberate friction.'
-                                                            : lockConfig.reprompt === 'session'
-                                                              ? 'Customers browse freely once unlocked, but are asked again when they come back later.'
-                                                              : 'Customers unlock once and are not asked again on that browser.'
-                                                    }
-                                                />
-                                                <Divider />
-                                                <Text variant="headingSm" as="h3">
-                                                    Variant behavior (product locks only)
-                                                </Text>
-                                                <Select
-                                                    label="When a variant is locked"
-                                                    options={[
-                                                        { label: 'Hide the variant option entirely', value: 'hide' },
-                                                        { label: 'Show but disable the variant option', value: 'disable' },
-                                                    ]}
-                                                    value={lockConfig.lockedVariantDisplay}
-                                                    onChange={(value) => {
-                                                        updateLockConfig({ lockedVariantDisplay: value });
-                                                        markDirty();
-                                                    }}
-                                                />
-                                                <Select
-                                                    label="When all variants of a product are locked"
-                                                    options={[
-                                                        { label: 'Hide the product entirely', value: 'hide_product' },
-                                                        { label: 'Show product but disable purchasing', value: 'show_disabled' },
-                                                    ]}
-                                                    value={lockConfig.allVariantsLockedBehavior}
-                                                    onChange={(value) => {
-                                                        updateLockConfig({ allVariantsLockedBehavior: value });
-                                                        markDirty();
-                                                    }}
-                                                />
-                                                <Divider />
-                                                <InlineStack gap="200" blockAlign="center">
-                                                    <Text variant="headingSm" as="h3">
-                                                        Schedule (optional)
-                                                    </Text>
-                                                    <PlanBadge tier={schedulingTier()} />
-                                                </InlineStack>
-                                                <Box>
-                                                    <InlineGrid columns={2} gap="400">
-                                                        <TextField
-                                                            label="Activate on"
-                                                            type="date"
-                                                            value={startDate}
-                                                            onChange={(value) => { setStartDate(value); markDirty(); }}
-                                                            autoComplete="off"
-                                                            prefix={<Icon source={CalendarIcon} />}
-                                                            disabled={!!schedulingTier()}
-                                                        />
-                                                        <TextField
-                                                            label="Time"
-                                                            type="time"
-                                                            value={startTime}
-                                                            onChange={(value) => { setStartTime(value); markDirty(); }}
-                                                            autoComplete="off"
-                                                            prefix={<Icon source={ClockIcon} />}
-                                                            disabled={!!schedulingTier() || !startDate}
-                                                        />
-                                                    </InlineGrid>
-                                                    <Box paddingBlockStart="100">
-                                                        <Text tone="subdued" variant="bodySm">
-                                                            Leave blank to activate immediately.
-                                                        </Text>
-                                                    </Box>
-                                                </Box>
-                                                <Box>
-                                                    <InlineGrid columns={2} gap="400">
-                                                        <TextField
-                                                            label="Expire on"
-                                                            type="date"
-                                                            value={endDate}
-                                                            onChange={(value) => { setEndDate(value); markDirty(); }}
-                                                            autoComplete="off"
-                                                            prefix={<Icon source={CalendarIcon} />}
-                                                            disabled={!!schedulingTier()}
-                                                        />
-                                                        <TextField
-                                                            label="Time"
-                                                            type="time"
-                                                            value={endTime}
-                                                            onChange={(value) => { setEndTime(value); markDirty(); }}
-                                                            autoComplete="off"
-                                                            prefix={<Icon source={ClockIcon} />}
-                                                            disabled={!!schedulingTier() || !endDate}
-                                                        />
-                                                    </InlineGrid>
-                                                    <Box paddingBlockStart="100">
-                                                        <Text tone="subdued" variant="bodySm">
-                                                            Leave blank for no expiration.
-                                                        </Text>
-                                                    </Box>
-                                                </Box>
-                                            </>
-                                        )}
-                                    </BlockStack>
-                                </Card>
-
-                                <Card>
-                                    <BlockStack gap="400">
-                                        <InlineStack align="space-between" blockAlign="center">
-                                            <Text variant="headingMd" as="h2">
-                                                Widgets
-                                            </Text>
-                                            <InlineStack gap="100">
-                                                {requiredWidgetTypes.needsForm && <Badge tone="info">Form</Badge>}
-                                                {requiredWidgetTypes.needsText && <Badge tone="success">Text</Badge>}
-                                            </InlineStack>
-                                        </InlineStack>
-                                        <Divider />
-
-                                        {!requiredWidgetTypes.needsForm && !requiredWidgetTypes.needsText && (
-                                            <Box
-                                                background="bg-surface-secondary"
-                                                padding="300"
-                                                borderRadius="200"
-                                                borderColor="border"
-                                                borderWidth="025"
-                                            >
-                                                <InlineStack gap="200" blockAlign="start" wrap={false}>
-                                                    <Icon source={InfoIcon} tone="subdued" />
-                                                    <Text as="p" variant="bodySm" tone="subdued">
-                                                        Add a condition to choose a widget design.
-                                                    </Text>
-                                                </InlineStack>
-                                            </Box>
-                                        )}
-
-                                        {requiredWidgetTypes.needsForm && (
-                                            <BlockStack gap="200">
-                                                <Box
-                                                    background="bg-surface-info"
-                                                    padding="300"
-                                                    borderRadius="200"
-                                                    borderColor="border-info"
-                                                    borderWidth="025"
-                                                >
-                                                    <InlineStack gap="200" blockAlign="start" wrap={false}>
-                                                        <Icon source={KeyIcon} tone="info" />
-                                                        <BlockStack gap="050">
-                                                            <Text as="span" variant="bodySm" fontWeight="medium">
-                                                                Form widget applies to this lock
-                                                            </Text>
-                                                            <Text as="p" variant="bodySm" tone="subdued">
-                                                                Used for conditions that need user input (passcode, age verification).
-                                                            </Text>
-                                                        </BlockStack>
-                                                    </InlineStack>
-                                                </Box>
-                                                <Select
-                                                    label="Form widget design"
-                                                    options={[
-                                                        { label: 'None (use default design)', value: '' },
-                                                        ...formWidgets.map((w) => ({ label: w.name, value: String(w.id) })),
-                                                    ]}
-                                                    value={lockConfig.widget_id ? String(lockConfig.widget_id) : ''}
-                                                    onChange={(value) => updateLockConfig({ widget_id: value })}
-                                                />
-                                                <CreateWidgetButton
-                                                    type="form"
-                                                    widgets={formWidgets}
-                                                    storeLocales={storeLocales}
-                                                    primaryLocale={primaryLocale}
-                                                    onCreated={(id) => updateLockConfig({ widget_id: id })}
-                                                />
-                                            </BlockStack>
-                                        )}
-
-                                        {requiredWidgetTypes.needsText && (
-                                            <BlockStack gap="200">
-                                                <Box
-                                                    background="bg-surface-success"
-                                                    padding="300"
-                                                    borderRadius="200"
-                                                    borderColor="border-success"
-                                                    borderWidth="025"
-                                                >
-                                                    <InlineStack gap="200" blockAlign="start" wrap={false}>
-                                                        <Icon source={InfoIcon} tone="success" />
-                                                        <BlockStack gap="050">
-                                                            <Text as="span" variant="bodySm" fontWeight="medium">
-                                                                Text widget applies to this lock
-                                                            </Text>
-                                                            <Text as="p" variant="bodySm" tone="subdued">
-                                                                Used for conditions that don't need input (tag, signed in, location).
-                                                            </Text>
-                                                        </BlockStack>
-                                                    </InlineStack>
-                                                </Box>
-                                                <Select
-                                                    label="Text widget design"
-                                                    options={[
-                                                        { label: 'None (use default design)', value: '' },
-                                                        ...textWidgets.map((w) => ({ label: w.name, value: String(w.id) })),
-                                                    ]}
-                                                    value={lockConfig.text_widget_id ? String(lockConfig.text_widget_id) : ''}
-                                                    onChange={(value) => updateLockConfig({ text_widget_id: value })}
-                                                />
-                                                <CreateWidgetButton
-                                                    type="text"
-                                                    widgets={textWidgets}
-                                                    storeLocales={storeLocales}
-                                                    primaryLocale={primaryLocale}
-                                                    onCreated={(id) => updateLockConfig({ text_widget_id: id })}
-                                                />
-                                            </BlockStack>
-                                        )}
-
-                                    <Divider />
-
-                                    {/* Wording sits beside the design it words, not in a card of its own. */}
-                                    <PopupTextModal
-                                        popupText={lockConfig.popupText}
-                                        description={lockConfig.description}
-                                        onChange={(popupText) => updateLockConfig({ popupText })}
-                                        onDescriptionChange={(description) => updateLockConfig({ description })}
-                                        groups={groups}
-                                        widget={[...formWidgets, ...textWidgets].find(
-                                            (w) => String(w.id) === String(lockConfig.widget_id || lockConfig.text_widget_id),
-                                        )}
-                                        storeLocales={storeLocales}
-                                        primaryLocale={primaryLocale}
-                                    />
-                                    </BlockStack>
-                                </Card>
-
-                            </BlockStack>
-                        </InlineGrid>
-                    </Layout.Section>
-
-                    {/* ===== CONTENT SELECTION MODAL ===== */}
-                    <Modal
-                        open={selectionModalActive}
-                        onClose={() => setSelectionModalActive(false)}
-                        title={`Select ${lockConfig.selectedContentType || 'Content'}`}
-                        large
-                        primaryAction={{ content: 'Add Selected', onAction: () => setSelectionModalActive(false) }}
-                        secondaryActions={[{ content: 'Cancel', onAction: () => setSelectionModalActive(false) }]}
-                    >
-                        <Modal.Section>
-                            <div className="py-4">
-                                <Box padding="400" background="bg-surface-secondary" borderRadius="300" shadow="sm">
-                                    <BlockStack gap="400">
-                                        <InlineStack gap="300" blockAlign="center">
-                                            <div className="flex-1">
-                                                <TextField
-                                                    label={`Search ${lockConfig.selectedContentType}`}
-                                                    labelHidden
-                                                    prefix={<Icon source={SearchIcon} />}
-                                                    value={searchQuery}
-                                                    onChange={setSearchQuery}
-                                                    placeholder={`Search ${lockConfig.selectedContentType}...`}
-                                                    autoComplete="off"
-                                                    clearButton
-                                                    onClearButtonClick={() => setSearchQuery('')}
-                                                />
-                                            </div>
-                                            <div className="w-[140px]">
-                                                <Select options={searchOptions} value={searchBy} onChange={setSearchBy} />
-                                            </div>
-                                            {renderFilterTypeDropdown()}
-                                        </InlineStack>
-
-                                        {activeFilters.length > 0 && (
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                {activeFilters.map((filter) => renderFilterTag(filter))}
-                                                <Button plain onClick={handleClearAllFilters} size="slim">
-                                                    Clear all
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </BlockStack>
-                                </Box>
-
-                                <InlineStack align="space-between" blockAlign="center">
-                                    <InlineStack gap="200" blockAlign="center">
-                                        <Text variant="bodySm" tone="subdued">
-                                            Showing {Math.min(filteredData.length, itemsPerPage)} of {filteredData.length} items
-                                        </Text>
-                                        {/* Pages, blogs and themes have no Shopify webhooks, so this
-                                            list goes stale after install until it is re-read. */}
-                                        <Button
-                                            variant="plain"
-                                            icon={RefreshIcon}
-                                            loading={refreshingCatalog}
-                                            onClick={refreshCatalog}
-                                        >
-                                            Refresh from Shopify
-                                        </Button>
-                                    </InlineStack>
-                                    {paginatedData.length > 0 && (
-                                        <Button onClick={handleSelectAllOnPage} size="slim">
-                                            {filteredData.every((item) => {
-                                                const idFieldMap = {
-                                                    products: 'shopify_product_id',
-                                                    collections: 'shopify_collection_id',
-                                                    pages: 'shopify_page_id',
-                                                    blogs: 'shopify_blog_id',
-                                                    themes: 'shopify_theme_id',
-                                                };
-                                                const selId = `${lockConfig.selectedContentType}-${item[idFieldMap[lockConfig.selectedContentType]] || item.id}`;
-                                                return lockConfig.selectedItems.includes(selId);
-                                            })
-                                                ? 'Deselect all'
-                                                : 'Select all'}
-                                        </Button>
-                                    )}
-                                </InlineStack>
-
-                                <div className="mt-4 max-h-[400px] min-h-[400px] overflow-y-auto">
-                                    {isLoading ? (
-                                        <div className="flex items-center justify-center py-10">
-                                            <Spinner size="large" />
-                                        </div>
-                                    ) : paginatedData.length > 0 ? (
-                                        paginatedData.map((item) => {
-                                            const idFieldMap = {
-                                                products: 'shopify_product_id',
-                                                collections: 'shopify_collection_id',
-                                                pages: 'shopify_page_id',
-                                                blogs: 'shopify_blog_id',
-                                                themes: 'shopify_theme_id',
-                                            };
-                                            const idField = idFieldMap[lockConfig.selectedContentType] || 'id';
-                                            // Fall back to item.id to match how hydration (line ~697) and the
-                                            // select-all check build the selId — without it, a product whose
-                                            // shopify_product_id is null renders `...-undefined` and never shows
-                                            // as checked even though it was hydrated as selected.
-                                            const selId = `${lockConfig.selectedContentType}-${item[idField] || item.id}`;
-                                            const isSelected = lockConfig.selectedItems.includes(selId);
-                                            const IconComponent = contentTypeIcons[lockConfig.selectedContentType];
-                                            const otherLockName = otherLockNameFor(lockConfig.selectedContentType, item.handle);
-
-                                            return (
-                                                <div
-                                                    key={selId}
-                                                    onClick={() => handleItemToggle(selId)}
-                                                    className={`flex cursor-pointer items-center gap-3 border-b border-gray-100 p-3 px-4 transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                                                >
-                                                    {/* Decorative — the row's onClick owns selection. Kept pointer-inert so a click on the
-                                                        checkbox can't re-fire through the <label> and double-toggle the row (net no-op). */}
-                                                    <span className="pointer-events-none">
-                                                        <Checkbox checked={isSelected} onChange={() => { }} label="" />
-                                                    </span>
-                                                    {lockConfig.selectedContentType === 'products' && item.image_url ? (
-                                                        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded bg-gray-100">
-                                                            <Image
-                                                                source={item.image_url}
-                                                                alt={item.title || item.name}
-                                                                className="h-full w-full object-cover"
-                                                            />
-                                                        </div>
-                                                    ) : (
-                                                        <div
-                                                            className={`flex h-10 w-10 items-center justify-center rounded ${isSelected ? 'bg-[#008060]' : 'bg-gray-200'}`}
-                                                        >
-                                                            <Icon source={IconComponent} tone={isSelected ? 'textInverse' : 'subdued'} />
-                                                        </div>
-                                                    )}
-                                                    <div className="flex-1">
-                                                        <InlineStack gap="200" blockAlign="center">
-                                                            <Text variant="bodyMd" fontWeight="medium">
-                                                                {item.title || item.name}
-                                                            </Text>
-                                                            {otherLockName ? <Badge tone="warning">{`Locked by "${otherLockName}"`}</Badge> : null}
-                                                        </InlineStack>
-                                                        <Text variant="bodySm" tone="subdued">
-                                                            {lockConfig.selectedContentType === 'products' && item.vendor && `Vendor: ${item.vendor}`}
-                                                            {lockConfig.selectedContentType === 'collections' &&
-                                                                item.products_count &&
-                                                                `Products: ${item.products_count}`}
-                                                        </Text>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
-                                    ) : (
-                                        <div className="py-10 text-center">
-                                            <Icon source={SearchIcon} tone="subdued" />
-                                            <Text variant="bodyMd" tone="subdued">
-                                                No items found
-                                            </Text>
-                                        </div>
-                                    )}
-                                </div>
-                                {totalPages > 1 && (
-                                    <Box padding="400">
-                                        <Pagination
-                                            hasNext={currentPage < totalPages}
-                                            hasPrevious={currentPage > 1}
-                                            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                                            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                                            label={`Page ${currentPage} of ${totalPages}`}
-                                        />
-                                    </Box>
-                                )}
-                                {/* Overlap warning — only ONE lock is enforced per item */}
-                                {selectedOverlaps.length > 0 && (
-                                    <Box paddingBlockEnd="300">
-                                        <Banner tone="warning" title="Some selected items are already covered by another active lock">
-                                            <p>
-                                                Only one lock is enforced per item — the one saved most recently (a custom widget design takes priority).
-                                                {' '}Overlapping: {selectedOverlaps.slice(0, 3).map((o) => `${o.title} (locked by "${o.lockName}")`).join(', ')}
-                                                {selectedOverlaps.length > 3 ? ` and ${selectedOverlaps.length - 3} more` : ''}.
-                                                {' '}Consider editing the existing lock instead, or remove the item from one of them.
-                                            </p>
-                                        </Banner>
-                                    </Box>
-                                )}
-
-                                {/* Selected Items Summary */}
-                                {lockConfig.selectedItems.length > 0 && (
-                                    <Box padding="400" background="bg-surface-info-subdued" borderRadius="300" borderStyle="dashed" borderWidth="025" borderColor="border-info">
-                                        <InlineStack align="space-between" blockAlign="center">
-                                            <InlineStack align="center" gap="300">
-                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                                                    <Icon source={CollectionIcon} tone="info" />
-                                                </div>
-                                                <BlockStack gap="050">
-                                                    <Text variant="bodyMd" fontWeight="semibold" tone="info">
-                                                        {lockConfig.selectedItems.length} item(s) selected
-                                                    </Text>
-                                                    <Text variant="bodySm" tone="subdued">
-                                                        Click 'Add Selected' to confirm
-                                                    </Text>
-                                                </BlockStack>
-                                            </InlineStack>
-                                            <Button onClick={() => updateLockConfig({ selectedItems: [] })} plain tone="critical" size="slim">
-                                                Deselect all
-                                            </Button>
-                                        </InlineStack>
-                                    </Box>
-                                )}
-                            </div>
-                        </Modal.Section>
-                    </Modal>
-                </Layout>
-            </Page>
-        </Frame>
+            {/* ===== CONTENT SELECTION MODAL ===== */}
+            <ItemPickerModal
+                open={selectionModalActive}
+                onClose={() => setSelectionModalActive(false)}
+                contentType={lockConfig.selectedContentType}
+                searchQuery={searchQuery}
+                onSearch={setSearchQuery}
+                searchBy={searchBy}
+                onSearchBy={setSearchBy}
+                searchOptions={searchOptions}
+                filterButton={renderFilterTypeDropdown()}
+                activeFilterTags={
+                    activeFilters.length > 0 ? (
+                        <div className="lb-filter-tags">
+                            {activeFilters.map((filter) => renderFilterTag(filter))}
+                            <button type="button" className="btn plain xs" onClick={handleClearAllFilters}>
+                                Clear all
+                            </button>
+                        </div>
+                    ) : null
+                }
+                filteredData={filteredData}
+                paginatedData={paginatedData}
+                isLoading={isLoading}
+                selectedItems={lockConfig.selectedItems}
+                onToggle={handleItemToggle}
+                onSelectAll={handleSelectAllOnPage}
+                refreshing={refreshingCatalog}
+                onRefresh={refreshCatalog}
+                otherLockNameFor={otherLockNameFor}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onNextPage={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                onPrevPage={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                selectedOverlaps={selectedOverlaps}
+            />
+        </>
     );
 };
 

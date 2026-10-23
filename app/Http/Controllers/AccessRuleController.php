@@ -134,7 +134,7 @@ class AccessRuleController extends Controller
             $this->updateBlogMetafield($shop, $accessRule);
         }
 
-        return to_route('home')->with('success', 'Access rule updated successfully!');
+        return to_route('locks.index')->with('success', 'Access rule updated successfully!');
     }
 
     public function destroy(AccessRule $accessRule)
@@ -149,7 +149,7 @@ class AccessRuleController extends Controller
 
         $accessRule->delete();
 
-        return to_route('home')->with('success', 'Access rule deleted successfully!');
+        return to_route('locks.index')->with('success', 'Access rule deleted successfully!');
     }
 
     // --- METAFIELD HELPERS ---

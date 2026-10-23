@@ -1,288 +1,150 @@
 import { router, usePage } from '@inertiajs/react';
 import { Modal, TitleBar, useAppBridge } from '@shopify/app-bridge-react';
-import {
-    ActionList,
-    Badge,
-    Banner,
-    BlockStack,
-    Box,
-    Button,
-    Card,
-    ChoiceList,
-    EmptyState,
-    Icon,
-    IndexFilters,
-    IndexTable,
-    InlineStack,
-    Page,
-    Pagination,
-    Popover,
-    Text,
-    TextField,
-    Tooltip,
-    useIndexResourceState,
-    useSetIndexFiltersMode,
-} from '@shopify/polaris';
-import {
-    ChevronRightIcon,
-    DeleteIcon,
-    EditIcon,
-    NoteIcon,
-    PlusCircleIcon,
-    TextIcon,
-    ViewIcon,
-} from '@shopify/polaris-icons';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileText, CheckCircle, EyeOff } from 'lucide-react';
+import { Banner, BlockStack, Box, Button, ChoiceList, InlineStack, Popover, Text } from '@shopify/polaris';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import '../../../css/pages/widgets.css';
+import { COLOUR_KEYS, COLOUR_LABELS, countLabel, widgetColours } from '../../components/widget/widgetDesign';
 import FormPreviewModal from './FormPreviewModal';
-import TextWidget from './TextWidget';
-import DynamicFormWidget from './Widgets';
 
-const ITEMS_PER_PAGE_DEFAULT = '10';
+/* ---------------------------------------------------------------------------
+   /widgetdashboard — the widget list.
 
-// ---------------------------------------------------------------------------
-// Shopify Toast helper
-// ---------------------------------------------------------------------------
+   A list of designs that shows them: every row carries its colours, in the
+   order the editor applies them (text, card, button, button text). Creating
+   and editing a widget happen on their own page (/widgets, /widgets?id=).
+--------------------------------------------------------------------------- */
+
+const ITEMS_PER_PAGE = 10;
+
+const SORTS = [
+    { value: 'name asc', label: 'Name A–Z' },
+    { value: 'name desc', label: 'Name Z–A' },
+    { value: 'created desc', label: 'Newest first' },
+    { value: 'created asc', label: 'Oldest first' },
+    { value: 'used desc', label: 'Most used' },
+    { value: 'type asc', label: 'Type' },
+    { value: 'status asc', label: 'Status' },
+];
+
+const DATE_LABELS = { today: 'Today', week: 'Last 7 days', month: 'Last 30 days', quarter: 'Last 90 days' };
+
 function useShopifyToast() {
     const app = useAppBridge();
     return useCallback(
         (message, { isError = false, duration = 3000 } = {}) => {
             try {
                 const Toast = app?.toast ?? window?.shopify?.toast;
-                if (Toast?.show) {
-                    Toast.show(message, { duration, isError });
-                }
+                if (Toast?.show) Toast.show(message, { duration, isError });
             } catch {
+                /* a toast is never worth failing over */
             }
         },
         [app],
     );
 }
 
-// ---------------------------------------------------------------------------
-// Knob Toggle — same as Dashboard
-// ---------------------------------------------------------------------------
-function KnobToggle({ checked, onChange, disabled = false }) {
-    return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={checked}
-            disabled={disabled}
-            onClick={() => !disabled && onChange(!checked)}
-            style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                opacity: disabled ? 0.5 : 1,
-            }}
-        >
-            <span
-                style={{
-                    position: 'relative',
-                    width: '40px',
-                    height: '22px',
-                    borderRadius: '11px',
-                    background: checked ? '#22c55e' : '#d1d5db',
-                    transition: 'background 0.2s ease',
-                    flexShrink: 0,
-                    boxShadow: checked ? '0 0 0 2px rgba(34,197,94,0.2)' : 'none',
-                }}
-            >
-                <span
-                    style={{
-                        position: 'absolute',
-                        top: '3px',
-                        left: checked ? '21px' : '3px',
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '50%',
-                        background: '#ffffff',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
-                        transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    }}
-                />
-            </span>
-            <span
-                style={{
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: checked ? '#16a34a' : '#6b7280',
-                    minWidth: '56px',
-                }}
-            >
-                {checked ? 'Active' : 'Inactive'}
-            </span>
-        </button>
-    );
+const formatDate = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const kindOf = (w) => (w.type === 'text' ? 'text' : 'form');
+const usedCount = (w) => (Array.isArray(w.usedBy) ? w.usedBy.length : 0);
+
+/** A checkbox that can say "some". */
+function Checkbox({ checked, indeterminate = false, onChange, label }) {
+    const ref = useRef(null);
+    useEffect(() => {
+        if (ref.current) ref.current.indeterminate = indeterminate;
+    }, [indeterminate]);
+    return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} aria-label={label} />;
 }
 
-// ---------------------------------------------------------------------------
-// Step Indicator
-// ---------------------------------------------------------------------------
-function StepIndicator({ currentStep, steps }) {
-    return (
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center', marginBottom: '24px' }}>
-            {steps.map((step, index) => {
-                const stepNumber = index + 1;
-                const isActive = stepNumber === currentStep;
-                const isCompleted = stepNumber < currentStep;
-                return (
-                    <div key={step.id} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <div
-                            style={{
-                                width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 13, fontWeight: 600,
-                                background: isActive ? '#8b5cf6' : isCompleted ? '#22c55e' : '#e5e7eb',
-                                color: isActive || isCompleted ? '#fff' : '#6b7280',
-                                transition: 'all 0.2s ease',
-                            }}
-                        >
-                            {isCompleted ? '✓' : stepNumber}
-                        </div>
-                        <Text variant="bodySm" fontWeight={isActive ? 'semibold' : 'regular'} tone={isActive ? undefined : 'subdued'}>
-                            {step.label}
-                        </Text>
-                        {index < steps.length - 1 && (
-                            <div style={{ marginLeft: 4, marginRight: 4 }}>
-                                <Icon source={ChevronRightIcon} tone="subdued" />
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
+const Ico = {
+    form: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="16" rx="2.5" />
+            <path d="M7 9h10M7 13h6" />
+        </svg>
+    ),
+    text: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 6h16M4 11h16M4 16h9" />
+        </svg>
+    ),
+    idle: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9 12h6" />
+        </svg>
+    ),
+    edit: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <path d="M14 6l4 4L8 20H4v-4z" />
+        </svg>
+    ),
+    duplicate: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <rect x="9" y="9" width="11" height="11" rx="2" />
+            <path d="M5 15V5a2 2 0 012-2h8" />
+        </svg>
+    ),
+    delete: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" />
+        </svg>
+    ),
+    search: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+        </svg>
+    ),
+    back: (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+        </svg>
+    ),
+};
 
-// ---------------------------------------------------------------------------
-// Widget Type Card
-// ---------------------------------------------------------------------------
-function WidgetTypeCard({ icon, title, description, onClick, isSelected }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            style={{
-                width: '100%',
-                cursor: 'pointer',
-                borderRadius: 12,
-                border: isSelected ? '2px solid #8b5cf6' : '2px solid #e5e7eb',
-                background: isSelected ? '#f5f3ff' : '#fff',
-                padding: '20px',
-                textAlign: 'left',
-                transition: 'all 0.2s ease',
-            }}
-        >
-            <BlockStack gap="400">
-                <div
-                    style={{
-                        width: 48, height: 48, borderRadius: 10,
-                        background: isSelected ? '#ede9fe' : '#f3f4f6',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                >
-                    <Icon source={icon} tone={isSelected ? 'info' : 'base'} />
-                </div>
-                <BlockStack gap="100">
-                    <Text variant="headingMd" as="h3">{title}</Text>
-                    <Text variant="bodySm" tone="subdued">{description}</Text>
-                </BlockStack>
-            </BlockStack>
-        </button>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Main FormsDashboard
-// ---------------------------------------------------------------------------
 export default function FormsDashboard() {
     const { widgets: initialWidgets = [], storeLocales = [], primaryLocale = '' } = usePage().props;
     const showToast = useShopifyToast();
     const [forms, setForms] = useState(initialWidgets);
-    const [refreshingLocales, setRefreshingLocales] = useState(false);
-
-    // Re-pull the shop's published languages from Shopify. Inertia refreshes
-    // the page props, so the editor's language list updates in place.
-    const handleRefreshStoreLocales = useCallback(() => {
-        setRefreshingLocales(true);
-        router.post(
-            '/widgets/refresh-locales',
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onFinish: () => setRefreshingLocales(false),
-            },
-        );
-    }, []);
-
-    // Props every widget editor needs for its Language panel.
-    const languageProps = {
-        storeLocales,
-        primaryLocale,
-        onRefreshStoreLocales: handleRefreshStoreLocales,
-        refreshingLocales,
-    };
 
     useEffect(() => {
         setForms(initialWidgets);
     }, [initialWidgets]);
 
+    // ------------------------------------------------------------ filters --
+    const [kindTab, setKindTab] = useState('all');
     const [queryValue, setQueryValue] = useState('');
     const [statusFilter, setStatusFilter] = useState([]);
-    const [typeFilter, setTypeFilter] = useState([]);
     const [dateFilter, setDateFilter] = useState([]);
-    const [sortState, setSortState] = useState({ columnIndex: 0, direction: 'ascending' });
-    const [activePopoverId, setActivePopoverId] = useState(null);
+    const [sort, setSort] = useState('name asc');
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const [selected, setSelected] = useState([]);
+    const [togglingStatusIds, setTogglingStatusIds] = useState(new Set());
+    const [busy, setBusy] = useState(false);
+
     const [deleteModalActive, setDeleteModalActive] = useState(false);
     const [formToDelete, setFormToDelete] = useState(null);
     const [bulkDeleteModalActive, setBulkDeleteModalActive] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(ITEMS_PER_PAGE_DEFAULT);
-    const [togglingStatusIds, setTogglingStatusIds] = useState(new Set());
-
-    // Multi-step create modal
-    const [createModalOpen, setCreateModalOpen] = useState(false);
-    const [createStep, setCreateStep] = useState(1);
-    const [newWidgetName, setNewWidgetName] = useState('');
-    const [selectedWidgetType, setSelectedWidgetType] = useState(null);
-    const [isCreating, setIsCreating] = useState(false);
-
-    // Edit modal
-    const [editModalOpen, setEditModalOpen] = useState(false);
-    const [formToEdit, setFormToEdit] = useState(null);
-
-    // Preview modal
     const [previewModalOpen, setPreviewModalOpen] = useState(false);
     const [formToPreview, setFormToPreview] = useState(null);
 
-    const { mode, setMode } = useSetIndexFiltersMode();
-
-    const steps = [
-        { id: 'name', label: 'Name' },
-        { id: 'type', label: 'Type' },
-        { id: 'configure', label: 'Configure' },
-    ];
-
-    // -------------------------------------------------------------------------
-    // Filtering & sorting
-    // -------------------------------------------------------------------------
     const filteredForms = useMemo(() => {
         let result = [...forms];
-        if (queryValue) {
-            result = result.filter((f) => f.name.toLowerCase().includes(queryValue.toLowerCase()));
+        if (kindTab !== 'all') result = result.filter((f) => kindOf(f) === kindTab);
+        if (queryValue.trim()) {
+            const q = queryValue.trim().toLowerCase();
+            result = result.filter((f) => (f.name || '').toLowerCase().includes(q) || String(f.id) === q.replace(/^#/, ''));
         }
-        if (statusFilter.length > 0) {
-            result = result.filter((f) => statusFilter.includes(f.status));
-        }
-        if (typeFilter.length > 0) {
-            result = result.filter((f) => typeFilter.includes(f.type || 'form'));
-        }
+        if (statusFilter.length > 0) result = result.filter((f) => statusFilter.includes(f.status));
         if (dateFilter.length > 0) {
             const now = new Date();
             result = result.filter((f) => {
@@ -296,627 +158,606 @@ export default function FormsDashboard() {
                 });
             });
         }
-        const { columnIndex, direction } = sortState;
+        const [field, direction] = sort.split(' ');
+        const dir = direction === 'desc' ? -1 : 1;
         result.sort((a, b) => {
             let cmp = 0;
-            if (columnIndex === 0) cmp = a.name.localeCompare(b.name);
-            else if (columnIndex === 1) cmp = (a.type || 'form').localeCompare(b.type || 'form');
-            else if (columnIndex === 2) cmp = a.status.localeCompare(b.status);
-            return direction === 'ascending' ? cmp : -cmp;
+            if (field === 'name') cmp = (a.name || '').localeCompare(b.name || '');
+            else if (field === 'type') cmp = kindOf(a).localeCompare(kindOf(b));
+            else if (field === 'status') cmp = (a.status || '').localeCompare(b.status || '');
+            else if (field === 'created') cmp = new Date(a.createdAt) - new Date(b.createdAt);
+            else if (field === 'used') cmp = usedCount(a) - usedCount(b);
+            if (cmp === 0 && field !== 'name') cmp = dir * (a.name || '').localeCompare(b.name || '');
+            return dir * cmp;
         });
         return result;
-    }, [forms, queryValue, statusFilter, typeFilter, dateFilter, sortState]);
+    }, [forms, kindTab, queryValue, statusFilter, dateFilter, sort]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredForms.length / Number(itemsPerPage)));
-    const paginatedForms = useMemo(() => {
-        const start = (currentPage - 1) * Number(itemsPerPage);
-        return filteredForms.slice(start, start + Number(itemsPerPage));
-    }, [filteredForms, currentPage, itemsPerPage]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [kindTab, queryValue, statusFilter, dateFilter, sort]);
 
-    useMemo(() => { setCurrentPage(1); }, [queryValue, statusFilter, typeFilter, dateFilter, sortState]);
+    // A selection only ever holds rows that still exist.
+    useEffect(() => {
+        const ids = new Set(forms.map((f) => f.id));
+        setSelected((s) => (s.every((id) => ids.has(id)) ? s : s.filter((id) => ids.has(id))));
+    }, [forms]);
 
-    const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } = useIndexResourceState(filteredForms);
+    const totalPages = Math.max(1, Math.ceil(filteredForms.length / ITEMS_PER_PAGE));
+    const page = Math.min(currentPage, totalPages);
+    const paginatedForms = filteredForms.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
-    // -------------------------------------------------------------------------
-    // Filter handlers
-    // -------------------------------------------------------------------------
-    const handleQueryChange = useCallback((v) => { setQueryValue(v); setCurrentPage(1); }, []);
-    const handleQueryClear = useCallback(() => { setQueryValue(''); setCurrentPage(1); }, []);
-    const handleStatusFilterChange = useCallback((v) => { setStatusFilter(v); setCurrentPage(1); }, []);
-    const handleTypeFilterChange = useCallback((v) => { setTypeFilter(v); setCurrentPage(1); }, []);
-    const handleDateFilterChange = useCallback((v) => { setDateFilter(v); setCurrentPage(1); }, []);
-    const handleStatusFilterRemove = useCallback(() => { setStatusFilter([]); setCurrentPage(1); }, []);
-    const handleTypeFilterRemove = useCallback(() => { setTypeFilter([]); setCurrentPage(1); }, []);
-    const handleDateFilterRemove = useCallback(() => { setDateFilter([]); setCurrentPage(1); }, []);
-    const handleFiltersClearAll = useCallback(() => { setQueryValue(''); setStatusFilter([]); setTypeFilter([]); setDateFilter([]); setCurrentPage(1); }, []);
-    const handleSort = useCallback((idx, dir) => { setSortState({ columnIndex: idx, direction: dir }); setCurrentPage(1); }, []);
-
-    const togglePopover = useCallback((id) => {
-        setActivePopoverId((current) => {
-            if (current === id) return null;
-            setTimeout(() => setActivePopoverId(id), 1);
-            return null;
-        });
-    }, []);
-    const closePopover = useCallback(() => setActivePopoverId(null), []);
-
-    // -------------------------------------------------------------------------
-    // Status toggle (knob)
-    // -------------------------------------------------------------------------
-    const handleStatusToggle = useCallback((form) => {
-        if (togglingStatusIds.has(form.id)) return;
-        const newActive = form.status !== 'active';
-        setTogglingStatusIds((s) => new Set([...s, form.id]));
-        router.post('/widgets/bulk-status', { ids: [form.id], is_active: newActive }, {
-            onSuccess: () => {
-                showToast(`"${form.name}" ${newActive ? 'activated' : 'deactivated'}.`);
-                setTogglingStatusIds((s) => { const n = new Set(s); n.delete(form.id); return n; });
-            },
-            onError: () => {
-                showToast('Failed to update status.', { isError: true });
-                setTogglingStatusIds((s) => { const n = new Set(s); n.delete(form.id); return n; });
-            },
-        });
-    }, [togglingStatusIds, showToast]);
-
-    // -------------------------------------------------------------------------
-    // CRUD handlers
-    // -------------------------------------------------------------------------
-    const handleCreateNew = useCallback(() => {
-        setNewWidgetName('');
-        setSelectedWidgetType(null);
-        setCreateStep(1);
-        setCreateModalOpen(false);
-        setTimeout(() => setCreateModalOpen(true), 1);
+    const filtersActive = queryValue.trim() !== '' || statusFilter.length > 0 || dateFilter.length > 0 || kindTab !== 'all';
+    const handleFiltersClearAll = useCallback(() => {
+        setQueryValue('');
+        setStatusFilter([]);
+        setDateFilter([]);
+        setKindTab('all');
     }, []);
 
-    const handleNextStep = useCallback(() => {
-        if (createStep === 1 && newWidgetName.trim()) setCreateStep(2);
-        else if (createStep === 2 && selectedWidgetType) setCreateStep(3);
-    }, [createStep, newWidgetName, selectedWidgetType]);
+    // ----------------------------------------------------------- selection --
+    const visibleIds = filteredForms.map((f) => f.id);
+    const selectedVisible = visibleIds.filter((id) => selected.includes(id));
+    const allSelected = visibleIds.length > 0 && selectedVisible.length === visibleIds.length;
+    const someSelected = selectedVisible.length > 0 && !allSelected;
+    const clearSelection = useCallback(() => setSelected([]), []);
+    const toggleAll = () => setSelected(allSelected ? [] : visibleIds);
+    const toggleOne = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
-    const handlePreviousStep = useCallback(() => {
-        if (createStep === 2) setCreateStep(1);
-        else if (createStep === 3) { setSelectedWidgetType(null); setCreateStep(2); }
-    }, [createStep]);
+    // -------------------------------------------------------------- status --
+    const handleStatusToggle = useCallback(
+        (form) => {
+            if (togglingStatusIds.has(form.id)) return;
+            const newActive = form.status !== 'active';
+            const done = () =>
+                setTogglingStatusIds((s) => {
+                    const n = new Set(s);
+                    n.delete(form.id);
+                    return n;
+                });
+            setTogglingStatusIds((s) => new Set([...s, form.id]));
+            router.post(
+                '/widgets/bulk-status',
+                { ids: [form.id], is_active: newActive },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        showToast(`"${form.name}" ${newActive ? 'activated' : 'deactivated'}.`);
+                        done();
+                    },
+                    onError: () => {
+                        showToast('Failed to update status.', { isError: true });
+                        done();
+                    },
+                },
+            );
+        },
+        [togglingStatusIds, showToast],
+    );
 
-    const handleCloseCreateModal = useCallback(() => {
-        setCreateModalOpen(false);
-        setCreateStep(1);
-        setNewWidgetName('');
-        setSelectedWidgetType(null);
-        setIsCreating(false);
-    }, []);
+    // ---------------------------------------------------------------- CRUD --
+    const handleCreateNew = useCallback(() => router.visit('/widgets'), []);
+    const handleEdit = useCallback((form) => router.visit(`/widgets?id=${encodeURIComponent(form.id)}`), []);
 
     const handleView = useCallback((form) => {
-        closePopover();
         setPreviewModalOpen(false);
         setFormToPreview(null);
-        setTimeout(() => { setFormToPreview(form); setPreviewModalOpen(true); }, 50);
-    }, [closePopover]);
+        setTimeout(() => {
+            setFormToPreview(form);
+            setPreviewModalOpen(true);
+        }, 50);
+    }, []);
+    const handleClosePreview = useCallback(() => {
+        setPreviewModalOpen(false);
+        setFormToPreview(null);
+    }, []);
 
-    const handleClosePreview = useCallback(() => { setPreviewModalOpen(false); setFormToPreview(null); }, []);
-
-    const handleEdit = useCallback((form) => {
-        closePopover();
-        if (previewModalOpen) { setPreviewModalOpen(false); setFormToPreview(null); }
-        setFormToEdit(null);
-        setEditModalOpen(false);
-        setTimeout(() => { setFormToEdit(form); setEditModalOpen(true); }, 1);
-    }, [closePopover, previewModalOpen]);
-
-    const handleDuplicate = useCallback((form) => {
-        closePopover();
-        const newForm = { ...form, id: String(Date.now()), name: `${form.name} (Copy)`, status: 'deactive', createdAt: new Date().toISOString(), submissions: 0 };
-        setForms((prev) => [newForm, ...prev]);
-        showToast(`"${form.name}" duplicated successfully.`);
-    }, [closePopover, showToast]);
+    // A copy is a new widget with the same design, saved like any other.
+    const handleDuplicate = useCallback(
+        (form) => {
+            const configuration = kindOf(form) === 'text' ? form.textData : form.formData;
+            if (!configuration || typeof configuration !== 'object') {
+                showToast('This widget has no saved design to copy.', { isError: true });
+                return;
+            }
+            setBusy(true);
+            router.post(
+                '/widgets/store',
+                { name: `${form.name} (Copy)`, type: kindOf(form), configuration },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => showToast(`"${form.name}" duplicated successfully.`),
+                    onError: (errors) =>
+                        showToast(Object.values(errors || {}).flat().join(', ') || 'Failed to duplicate widget.', { isError: true }),
+                    onFinish: () => setBusy(false),
+                },
+            );
+        },
+        [showToast],
+    );
 
     const handleDeleteClick = useCallback((form) => {
-        closePopover();
         setFormToDelete(null);
         setDeleteModalActive(false);
-        setTimeout(() => { setFormToDelete(form); setDeleteModalActive(true); }, 1);
-    }, [closePopover]);
+        setTimeout(() => {
+            setFormToDelete(form);
+            setDeleteModalActive(true);
+        }, 1);
+    }, []);
 
     const handleDeleteConfirm = useCallback(() => {
-        if (formToDelete) {
-            router.delete(`/widgets/${formToDelete.id}`, {
-                onSuccess: () => { showToast(`"${formToDelete.name}" deleted successfully.`); setFormToDelete(null); setDeleteModalActive(false); },
-                onError: () => showToast('Failed to delete widget.', { isError: true }),
-            });
-        }
+        if (!formToDelete) return;
+        setBusy(true);
+        router.delete(`/widgets/${formToDelete.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                showToast(`"${formToDelete.name}" deleted successfully.`);
+                setFormToDelete(null);
+                setDeleteModalActive(false);
+            },
+            onError: () => showToast('Failed to delete widget.', { isError: true }),
+            onFinish: () => setBusy(false),
+        });
     }, [formToDelete, showToast]);
 
     const handleBulkActivate = useCallback(() => {
-        router.post('/widgets/bulk-status', { ids: selectedResources, is_active: true }, {
-            onSuccess: () => { showToast(`${selectedResources.length} widget(s) activated.`); clearSelection(); },
-            onError: () => showToast('Failed to activate widgets.', { isError: true }),
-        });
-    }, [selectedResources, showToast, clearSelection]);
+        const ids = [...selected];
+        router.post(
+            '/widgets/bulk-status',
+            { ids, is_active: true },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    showToast(`${ids.length} widget(s) activated.`);
+                    clearSelection();
+                },
+                onError: () => showToast('Failed to activate widgets.', { isError: true }),
+            },
+        );
+    }, [selected, showToast, clearSelection]);
 
     const handleBulkDeactivate = useCallback(() => {
-        router.post('/widgets/bulk-status', { ids: selectedResources, is_active: false }, {
-            onSuccess: () => { showToast(`${selectedResources.length} widget(s) deactivated.`); clearSelection(); },
-            onError: () => showToast('Failed to deactivate widgets.', { isError: true }),
-        });
-    }, [selectedResources, showToast, clearSelection]);
+        const ids = [...selected];
+        router.post(
+            '/widgets/bulk-status',
+            { ids, is_active: false },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    showToast(`${ids.length} widget(s) deactivated.`);
+                    clearSelection();
+                },
+                onError: () => showToast('Failed to deactivate widgets.', { isError: true }),
+            },
+        );
+    }, [selected, showToast, clearSelection]);
 
     const handleBulkDeleteConfirm = useCallback(() => {
-        router.post('/widgets/bulk-delete', { ids: selectedResources }, {
-            onSuccess: () => { showToast(`${selectedResources.length} widget(s) deleted.`); clearSelection(); setBulkDeleteModalActive(false); },
-            onError: () => showToast('Failed to delete widgets.', { isError: true }),
-        });
-    }, [selectedResources, showToast, clearSelection]);
-
-    // Form widget create / edit submit
-    const handleFormSubmit = useCallback((formData) => {
-        setIsCreating(true);
-        router.post('/widgets/store', { name: newWidgetName || 'Untitled Form', type: 'form', configuration: formData }, {
-            preserveScroll: true,
-            onSuccess: () => { handleCloseCreateModal(); showToast(`"${newWidgetName}" created successfully!`); },
-            onError: (errors) => { setIsCreating(false); showToast(Object.values(errors).flat().join(', ') || 'Failed to create widget.', { isError: true }); },
-            onFinish: () => setIsCreating(false),
-        });
-    }, [newWidgetName, showToast, handleCloseCreateModal]);
-
-    const handleTextWidgetSubmit = useCallback((textData) => {
-        setIsCreating(true);
-        router.post('/widgets/store', { name: newWidgetName || 'Untitled Text Widget', type: 'text', configuration: textData }, {
-            preserveScroll: true,
-            onSuccess: () => { handleCloseCreateModal(); showToast(`"${newWidgetName}" created successfully!`); },
-            onError: (errors) => { setIsCreating(false); showToast(Object.values(errors).flat().join(', ') || 'Failed to create widget.', { isError: true }); },
-            onFinish: () => setIsCreating(false),
-        });
-    }, [newWidgetName, showToast, handleCloseCreateModal]);
-
-    const handleFormUpdate = useCallback((formData) => {
-        if (!formToEdit) return;
-        setIsCreating(true);
-        router.put(`/widgets/${formToEdit.id}`, { configuration: formData }, {
-            onSuccess: () => { setEditModalOpen(false); setFormToEdit(null); showToast(`"${formToEdit.name}" updated successfully!`); },
-            onError: () => { showToast('Failed to update widget.', { isError: true }); setIsCreating(false); },
-            onFinish: () => setIsCreating(false),
-        });
-    }, [formToEdit, showToast]);
-
-    const handleTextWidgetUpdate = useCallback((textData) => {
-        if (!formToEdit) return;
-        setIsCreating(true);
-        router.put(`/widgets/${formToEdit.id}`, { configuration: textData }, {
-            onSuccess: () => { setEditModalOpen(false); setFormToEdit(null); showToast(`"${formToEdit.name}" updated successfully!`); },
-            onError: () => { showToast('Failed to update widget.', { isError: true }); setIsCreating(false); },
-            onFinish: () => setIsCreating(false),
-        });
-    }, [formToEdit, showToast]);
-
-    // -------------------------------------------------------------------------
-    // Tabs / filters config
-    // -------------------------------------------------------------------------
-    const [selectedTab, setSelectedTab] = useState(0);
-    const tabs = [
-        { id: 'all', content: 'All', accessibilityLabel: 'All widgets', panelID: 'all-widgets' },
-        { id: 'active', content: 'Active', accessibilityLabel: 'Active widgets', panelID: 'active-widgets' },
-        { id: 'deactive', content: 'Inactive', accessibilityLabel: 'Inactive widgets', panelID: 'deactive-widgets' },
-    ];
-
-    const handleTabChange = useCallback((i) => {
-        setSelectedTab(i);
-        setStatusFilter(tabs[i].id === 'all' ? [] : [tabs[i].id]);
-        setCurrentPage(1);
-    }, []);
-
-    const [sortSelected, setSortSelected] = useState(['name asc']);
-    const handleSortChange = useCallback((value) => {
-        setSortSelected(value);
-        const [field, direction] = value[0].split(' ');
-        setSortState({ columnIndex: { name: 0, type: 1, status: 2 }[field] ?? 0, direction });
-        setCurrentPage(1);
-    }, []);
-
-    const sortOptions = [
-        { label: 'Widget name', value: 'name asc', directionLabel: 'A–Z' },
-        { label: 'Widget name', value: 'name desc', directionLabel: 'Z–A' },
-        { label: 'Type', value: 'type asc', directionLabel: 'A–Z' },
-        { label: 'Type', value: 'type desc', directionLabel: 'Z–A' },
-    ];
-
-    const filters = [
-        {
-            key: 'status', label: 'Status',
-            filter: <ChoiceList title="Status" titleHidden choices={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'deactive' }]} selected={statusFilter} onChange={handleStatusFilterChange} allowMultiple />,
-            shortcut: true,
-        },
-        {
-            key: 'type', label: 'Type',
-            filter: <ChoiceList title="Type" titleHidden choices={[{ label: 'Form Widget', value: 'form' }, { label: 'Text Widget', value: 'text' }]} selected={typeFilter} onChange={handleTypeFilterChange} allowMultiple />,
-            shortcut: true,
-        },
-        {
-            key: 'date', label: 'Created date',
-            filter: <ChoiceList title="Created date" titleHidden choices={[{ label: 'Today', value: 'today' }, { label: 'Last 7 days', value: 'week' }, { label: 'Last 30 days', value: 'month' }, { label: 'Last 90 days', value: 'quarter' }]} selected={dateFilter} onChange={handleDateFilterChange} allowMultiple />,
-            shortcut: true,
-        },
-    ];
-
-    const appliedFilters = [];
-    if (statusFilter.length > 0) {
-        appliedFilters.push({ key: 'status', label: `Status: ${statusFilter.map((s) => s === 'deactive' ? 'Inactive' : 'Active').join(', ')}`, onRemove: handleStatusFilterRemove });
-    }
-    if (typeFilter.length > 0) {
-        appliedFilters.push({ key: 'type', label: `Type: ${typeFilter.map((t) => t === 'form' ? 'Form' : 'Text').join(', ')}`, onRemove: handleTypeFilterRemove });
-    }
-    if (dateFilter.length > 0) {
-        const dl = { today: 'Today', week: 'Last 7 days', month: 'Last 30 days', quarter: 'Last 90 days' };
-        appliedFilters.push({ key: 'date', label: `Created: ${dateFilter.map((d) => dl[d]).join(', ')}`, onRemove: handleDateFilterRemove });
-    }
-
-    const promotedBulkActions = [
-        { content: 'Activate', onAction: handleBulkActivate },
-        { content: 'Deactivate', onAction: handleBulkDeactivate },
-    ];
-    const bulkActions = [{ content: 'Delete selected', destructive: true, onAction: () => setBulkDeleteModalActive(true) }];
-
-    // -------------------------------------------------------------------------
-    // Type badge pill (same style as Dashboard)
-    // -------------------------------------------------------------------------
-    const typeBadge = (type) => {
-        if (type === 'form') return { label: 'Form', color: '#ede9fe', text: '#5b21b6' };
-        if (type === 'text') return { label: 'Text', color: '#fef3c7', text: '#92400e' };
-        return { label: 'Form', color: '#ede9fe', text: '#5b21b6' };
-    };
-
-    // -------------------------------------------------------------------------
-    // Row markup
-    // -------------------------------------------------------------------------
-    const rowMarkup = paginatedForms.map((form, index) => {
-        const actualIndex = (currentPage - 1) * Number(itemsPerPage) + index;
-        const tb = typeBadge(form.type);
-        const isToggling = togglingStatusIds.has(form.id);
-        const createdAt = form.createdAt ? new Date(form.createdAt).toLocaleDateString() : '—';
-        const updatedAt = form.updatedAt ? new Date(form.updatedAt).toLocaleDateString() : '—';
-
-        return (
-            <IndexTable.Row id={form.id} key={form.id} selected={selectedResources.includes(form.id)} position={actualIndex}>
-
-                {/* Widget Name + ID */}
-                <IndexTable.Cell>
-                    <BlockStack gap="050">
-                        <Button variant="plain" textAlign="left" onClick={() => handleEdit(form)}>
-                            <Text variant="bodyMd" fontWeight="semibold" as="span">{form.name}</Text>
-                        </Button>
-                        <Text variant="bodySm" tone="subdued" as="span">ID: {form.id}</Text>
-                    </BlockStack>
-                </IndexTable.Cell>
-
-                {/* Type pill */}
-                <IndexTable.Cell>
-                    <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: tb.color, color: tb.text }}>
-                        {tb.label}
-                    </span>
-                </IndexTable.Cell>
-
-                {/* Created */}
-                <IndexTable.Cell>
-                    <BlockStack gap="0">
-                        <Text variant="bodySm" as="span">{createdAt}</Text>
-                        <Text variant="bodySm" tone="subdued" as="span">Created</Text>
-                    </BlockStack>
-                </IndexTable.Cell>
-
-                {/* Status knob */}
-                <IndexTable.Cell>
-                    <KnobToggle
-                        checked={form.status === 'active'}
-                        onChange={() => handleStatusToggle(form)}
-                        disabled={isToggling}
-                    />
-                </IndexTable.Cell>
-
-                {/* Actions */}
-                <IndexTable.Cell>
-                    <InlineStack gap="150" align="end" blockAlign="center">
-                        <Tooltip content="Preview widget">
-                            <Button
-                                size="slim"
-                                icon={ViewIcon}
-                                variant="secondary"
-                                onClick={() => handleView(form)}
-                                accessibilityLabel={`Preview ${form.name}`}
-                            />
-                        </Tooltip>
-                        <Tooltip content="Edit widget">
-                            <Button
-                                size="slim"
-                                icon={EditIcon}
-                                onClick={() => handleEdit(form)}
-                                accessibilityLabel={`Edit ${form.name}`}
-                            >
-                                Edit
-                            </Button>
-                        </Tooltip>
-                        <Tooltip content="Delete widget">
-                            <Button
-                                size="slim"
-                                tone="critical"
-                                variant="secondary"
-                                icon={DeleteIcon}
-                                onClick={() => handleDeleteClick(form)}
-                                accessibilityLabel={`Delete ${form.name}`}
-                            />
-                        </Tooltip>
-                    </InlineStack>
-                </IndexTable.Cell>
-            </IndexTable.Row>
+        const ids = [...selected];
+        setBusy(true);
+        router.post(
+            '/widgets/bulk-delete',
+            { ids },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    showToast(`${ids.length} widget(s) deleted.`);
+                    clearSelection();
+                    setBulkDeleteModalActive(false);
+                },
+                onError: () => showToast('Failed to delete widgets.', { isError: true }),
+                onFinish: () => setBusy(false),
+            },
         );
-    });
+    }, [selected, showToast, clearSelection]);
 
-    // -------------------------------------------------------------------------
-    // Stats
-    // -------------------------------------------------------------------------
-    const totalFormsCount = forms.length;
-    const activeFormsCount = forms.filter((f) => f.status === 'active').length;
-    const deactiveFormsCount = forms.filter((f) => f.status === 'deactive').length;
-    const formWidgetsCount = forms.filter((f) => f.type === 'form' || !f.type).length;
-    const textWidgetsCount = forms.filter((f) => f.type === 'text').length;
+    // --------------------------------------------------------------- stats --
+    // Every figure is the list counted, so none can go stale behind it.
+    const formWidgetsCount = forms.filter((f) => kindOf(f) === 'form').length;
+    const textWidgetsCount = forms.filter((f) => kindOf(f) === 'text').length;
+    const unusedCount = forms.filter((f) => usedCount(f) === 0).length;
 
-    // -------------------------------------------------------------------------
-    // Create modal content
-    // -------------------------------------------------------------------------
+    const selectedUsedBy = forms.filter((f) => selected.includes(f.id)).reduce((n, f) => n + usedCount(f), 0);
+    const filterCount = statusFilter.length + dateFilter.length;
+
     const renderModalFooter = (children) => (
-        <Box
-            padding="400"
-            borderBlockStartWidth="025"
-            borderColor="border"
-            background="bg-surface-secondary"
-        >
+        <Box padding="400" borderBlockStartWidth="025" borderColor="border" background="bg-surface-secondary">
             <InlineStack align="end" gap="200">
                 {children}
             </InlineStack>
         </Box>
     );
 
-    const renderCreateModalContent = () => {
-        switch (createStep) {
-            case 1:
-                return (
-                    <BlockStack gap="0">
-                        <Box padding="600">
-                            <BlockStack gap="600">
-                                <StepIndicator currentStep={1} steps={steps} />
-                                <BlockStack gap="400">
-                                    <Text variant="headingMd" as="h2">Name your widget</Text>
-                                    <Text variant="bodyMd" tone="subdued">Give your widget a descriptive name to help you identify it later.</Text>
-                                </BlockStack>
-                                <TextField
-                                    label="Widget name"
-                                    value={newWidgetName}
-                                    onChange={setNewWidgetName}
-                                    placeholder="e.g., Lock Form"
-                                    autoComplete="off"
-                                    autoFocus
-                                />
-                            </BlockStack>
-                        </Box>
-                        {renderModalFooter(
-                            <>
-                                <Button onClick={handleCloseCreateModal} disabled={isCreating}>Cancel</Button>
-                                <Button variant="primary" onClick={handleNextStep} disabled={!newWidgetName.trim() || isCreating}>
-                                    Next
-                                </Button>
-                            </>,
-                        )}
-                    </BlockStack>
-                );
-            case 2:
-                return (
-                    <BlockStack gap="0">
-                        <Box padding="600">
-                            <BlockStack gap="600">
-                                <StepIndicator currentStep={2} steps={steps} />
-                                <BlockStack gap="400">
-                                    <Text variant="headingMd" as="h2">Choose widget type</Text>
-                                    <Text variant="bodyMd" tone="subdued">Select the type of widget you want to create for "{newWidgetName}".</Text>
-                                </BlockStack>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                    <WidgetTypeCard icon={NoteIcon} title="Form Widget" description="Create custom forms shown to the users." onClick={() => setSelectedWidgetType('form')} isSelected={selectedWidgetType === 'form'} />
-                                    <WidgetTypeCard icon={TextIcon} title="Text Widget" description="Add custom text content with rich formatting, banners." onClick={() => setSelectedWidgetType('text')} isSelected={selectedWidgetType === 'text'} />
-                                </div>
-                            </BlockStack>
-                        </Box>
-                        {renderModalFooter(
-                            <>
-                                <Button onClick={handlePreviousStep} disabled={isCreating}>Back</Button>
-                                <Button variant="primary" onClick={handleNextStep} disabled={!selectedWidgetType || isCreating}>
-                                    Continue
-                                </Button>
-                            </>,
-                        )}
-                    </BlockStack>
-                );
-            case 3:
-                if (selectedWidgetType === 'form') return <DynamicFormWidget onSubmit={handleFormSubmit} onCancel={handleCloseCreateModal} formTitle={`Create: ${newWidgetName}`} isCreating={isCreating} {...languageProps} />;
-                if (selectedWidgetType === 'text') return <TextWidget widgetName={newWidgetName} onSubmit={handleTextWidgetSubmit} onCancel={handleCloseCreateModal} isCreating={isCreating} {...languageProps} />;
-                return null;
-            default:
-                return null;
-        }
-    };
+    // ---------------------------------------------------------------- rows --
+    const rows = paginatedForms.map((form) => {
+        const kind = kindOf(form);
+        const colours = widgetColours(form);
+        const used = usedCount(form);
+        const isToggling = togglingStatusIds.has(form.id);
+        const active = form.status === 'active';
+        const isSel = selected.includes(form.id);
 
-    // -------------------------------------------------------------------------
-    // Edit modal content
-    // -------------------------------------------------------------------------
-    const renderEditModalContent = () => {
-        if (!formToEdit) return null;
-        if (formToEdit.type === 'text') {
-            return <TextWidget widgetName={formToEdit.name} onSubmit={handleTextWidgetUpdate} onCancel={() => { setEditModalOpen(false); setFormToEdit(null); }} initialData={formToEdit.textData} isCreating={isCreating} {...languageProps} />;
-        }
-        return <DynamicFormWidget onSubmit={handleFormUpdate} onCancel={() => { setEditModalOpen(false); setFormToEdit(null); }} initialFormData={formToEdit?.formData} formTitle={`Edit: ${formToEdit?.name || 'Widget'}`} isCreating={isCreating} {...languageProps} />;
-    };
+        return (
+            <tr key={form.id} className={isSel ? 'sel' : undefined}>
+                <td>
+                    <Checkbox checked={isSel} onChange={() => toggleOne(form.id)} label={`Select ${form.name}`} />
+                </td>
+                <td>
+                    <span className="row g8 wd-name">
+                        <a
+                            className="strong"
+                            href={`/widgets?id=${form.id}`}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleEdit(form);
+                            }}
+                        >
+                            {form.name}
+                        </a>
+                        <span className={`tag ${kind}`}>{kind === 'form' ? 'Form' : 'Text'}</span>
+                        <span className="xs sub wd-id">#{form.id}</span>
+                    </span>
+                </td>
+                <td>
+                    <button
+                        type="button"
+                        className="sw-row"
+                        onClick={() => handleView(form)}
+                        title="Preview this design"
+                        aria-label={`Preview ${form.name}`}
+                    >
+                        {COLOUR_KEYS.form.map((k) =>
+                            colours[k] ? (
+                                <i key={k} style={{ background: colours[k] }} title={`${COLOUR_LABELS[k]}: ${colours[k].toUpperCase()}`} />
+                            ) : (
+                                <i key={k} className="none" title={`${COLOUR_LABELS[k]}: a text widget has no button`} />
+                            ),
+                        )}
+                    </button>
+                </td>
+                <td className="sm sub" title={used ? form.usedBy.map((l) => l.name).join(', ') : undefined}>
+                    {used ? countLabel(used, 'locks') : <span className="sub">Not used</span>}
+                </td>
+                <td className="sm sub">{formatDate(form.createdAt)}</td>
+                <td>
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={active}
+                        aria-label={active ? 'Active' : 'Inactive'}
+                        title={active ? 'Active' : 'Inactive'}
+                        className={`knob${active ? '' : ' off'}`}
+                        disabled={isToggling}
+                        onClick={() => handleStatusToggle(form)}
+                    />
+                </td>
+                <td className="end">
+                    <span className="row g8" style={{ justifyContent: 'flex-end' }}>
+                        <a
+                            className="btn icon"
+                            href={`/widgets?id=${form.id}`}
+                            aria-label={`Edit ${form.name}`}
+                            title="Edit"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleEdit(form);
+                            }}
+                        >
+                            {Ico.edit}
+                        </a>
+                        <button type="button" className="btn icon" aria-label={`Duplicate ${form.name}`} title="Duplicate" onClick={() => handleDuplicate(form)} disabled={busy}>
+                            {Ico.duplicate}
+                        </button>
+                        <button type="button" className="btn icon" aria-label={`Delete ${form.name}`} title="Delete" onClick={() => handleDeleteClick(form)} disabled={busy}>
+                            {Ico.delete}
+                        </button>
+                    </span>
+                </td>
+            </tr>
+        );
+    });
 
-    // -------------------------------------------------------------------------
-    // Render
-    // -------------------------------------------------------------------------
+    const deleteUsed = formToDelete ? usedCount(formToDelete) : 0;
+
     return (
-        <>
-            <Page
-                title="Widgets Dashboard"
-                backAction={{ content: 'Back', onAction: () => router.visit('/') }}
-                primaryAction={{ content: 'Create new widget', icon: PlusCircleIcon, onAction: handleCreateNew, accessibilityLabel: 'Create a new widget' }}
-            >
-                <style>{`
-                    .widget-stat-card { transition: all 0.25s ease; }
-                    .widget-stat-card:hover {
-                        border-color: #c4b5fd !important;
-                        box-shadow: 0 8px 30px rgba(139,92,246,0.1) !important;
-                        transform: translateY(-2px);
-                    }
-                `}</style>
-
-                <BlockStack gap="500">
-                    {/* Stat cards — same design as Dashboard */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                        {[
-                            { icon: FileText, label: 'Total Widgets', value: totalFormsCount, subtitle: `${formWidgetsCount} forms, ${textWidgetsCount} text` },
-                            { icon: CheckCircle, label: 'Active Widgets', value: activeFormsCount, subtitle: activeFormsCount === 0 ? 'None active' : `${((activeFormsCount / totalFormsCount) * 100).toFixed(0)}% of total` },
-                            { icon: EyeOff, label: 'Inactive Widgets', value: deactiveFormsCount, subtitle: deactiveFormsCount === 0 ? 'All active' : 'Not visible' },
-                        ].map((card, i) => (
-                            <div key={i} className="widget-stat-card" style={{ borderRadius: 12, background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14, transition: 'all 0.25s ease' }}>
-                                <div style={{ width: 42, height: 42, borderRadius: 10, background: '#f3f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                    <card.icon size={20} color="#8b5cf6" />
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block' }}>{card.label}</span>
-                                    <span style={{ fontSize: 24, fontWeight: 700, color: '#111827', display: 'block', lineHeight: '28px' }}>{card.value}</span>
-                                    <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.subtitle}</span>
-                                </div>
-                            </div>
-                        ))}
+        <div className="airo pg-widgets">
+            <main className="page full">
+                <div className="between wrap g12" style={{ marginBottom: 16 }}>
+                    <div style={{ minWidth: 0 }}>
+                        <a
+                            className="back-l"
+                            href="/"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                router.visit('/');
+                            }}
+                        >
+                            {Ico.back}
+                            Dashboard
+                        </a>
+                        <h1 style={{ fontSize: 20, fontWeight: 650, marginTop: 2 }}>Widgets</h1>
+                        <p className="sm sub mt4">
+                            A widget holds the colours, radius and padding a lock is shown with. One design can be shared by every lock.
+                        </p>
                     </div>
+                    <button type="button" className="btn primary" onClick={handleCreateNew}>
+                        &#43; Create new widget
+                    </button>
+                </div>
 
-                    {/* Table */}
-                    <div style={{ marginBottom: 15 }}>
-                        {forms.length === 0 ? (
-                            <Card>
-                                <EmptyState
-                                    heading="Create your first widget"
-                                    action={{ content: 'Create widget', onAction: handleCreateNew }}
-                                    image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                                >
-                                    <Text as="p" variant="bodyMd">Build custom forms and text widgets to enhance your store.</Text>
-                                </EmptyState>
-                            </Card>
-                        ) : (
-                            <Card padding="0">
-                                <IndexFilters
-                                    sortOptions={sortOptions}
-                                    sortSelected={sortSelected}
-                                    queryValue={queryValue}
-                                    queryPlaceholder="Search widgets…"
-                                    onQueryChange={handleQueryChange}
-                                    onQueryClear={handleQueryClear}
-                                    onSort={handleSortChange}
-                                    filters={filters}
-                                    appliedFilters={appliedFilters}
-                                    onClearAll={handleFiltersClearAll}
-                                    mode={mode}
-                                    setMode={setMode}
-                                    tabs={tabs}
-                                    selected={selectedTab}
-                                    onSelect={handleTabChange}
-                                    canCreateNewView={false}
-                                    cancelAction={{ onAction: () => setMode('default'), disabled: false, loading: false }}
-                                />
-
-                                {filteredForms.length > 0 ? (
-                                    <>
-                                        <IndexTable
-                                            resourceName={{ singular: 'widget', plural: 'widgets' }}
-                                            itemCount={filteredForms.length}
-                                            selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
-                                            onSelectionChange={handleSelectionChange}
-                                            headings={[
-                                                { title: 'Widget Name' },
-                                                { title: 'Type' },
-                                                { title: 'Created' },
-                                                { title: 'Status' },
-                                                { title: 'Actions', alignment: 'end' },
-                                            ]}
-                                            promotedBulkActions={promotedBulkActions}
-                                            bulkActions={bulkActions}
-                                            sortable={[true, true, false, false, false]}
-                                            sortDirection={sortState.direction}
-                                            sortColumnIndex={sortState.columnIndex}
-                                            onSort={handleSort}
-                                        >
-                                            {rowMarkup}
-                                        </IndexTable>
-
-                                        {filteredForms.length > Number(itemsPerPage) && (
-                                            <Box padding="400">
-                                                <InlineStack align="center">
-                                                    <Pagination
-                                                        hasPrevious={currentPage > 1}
-                                                        hasNext={currentPage < totalPages}
-                                                        onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                                                        onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                                                        label={`${currentPage} of ${totalPages}`}
-                                                    />
-                                                </InlineStack>
-                                            </Box>
-                                        )}
-                                    </>
-                                ) : (
-                                    <Box padding="400">
-                                        <BlockStack gap="200" align="center">
-                                            <Text as="p" variant="bodyMd" tone="subdued">No widgets found matching your criteria.</Text>
-                                            <Button onClick={handleFiltersClearAll}>Clear filters</Button>
-                                        </BlockStack>
-                                    </Box>
-                                )}
-                            </Card>
-                        )}
+                {/* What the library holds, which is the question the page opens with. */}
+                <div className="stat-row">
+                    <div className="stat">
+                        <span className="stat-ico form" aria-hidden="true">
+                            {Ico.form}
+                        </span>
+                        <div className="grow">
+                            <span className="stat-v">{formWidgetsCount}</span>
+                            <span className="stat-l">Form widgets</span>
+                            <span className="stat-note">Ask the visitor for something</span>
+                        </div>
                     </div>
-                </BlockStack>
-            </Page>
+                    <div className="stat">
+                        <span className="stat-ico text" aria-hidden="true">
+                            {Ico.text}
+                        </span>
+                        <div className="grow">
+                            <span className="stat-v">{textWidgetsCount}</span>
+                            <span className="stat-l">Text widgets</span>
+                            <span className="stat-note">Show a message only</span>
+                        </div>
+                    </div>
+                    <div className="stat">
+                        <span className="stat-ico idle" aria-hidden="true">
+                            {Ico.idle}
+                        </span>
+                        <div className="grow">
+                            <span className="stat-v">{unusedCount}</span>
+                            <span className="stat-l">Not in use</span>
+                            <span className="stat-note">Saved, no lock uses it</span>
+                        </div>
+                    </div>
+                </div>
 
-            {/* Delete single widget modal */}
-            <Modal id="delete-form-modal" open={deleteModalActive}>
-                <BlockStack gap="0">
-                    <Box padding="400">
-                        <BlockStack gap="400">
-                            <Text as="p" variant="bodyMd">Are you sure you want to delete "{formToDelete?.name}"?</Text>
-                            <Banner tone="warning">This action cannot be undone. All data will be permanently deleted.</Banner>
-                        </BlockStack>
-                    </Box>
-                    {renderModalFooter(
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                    {forms.length === 0 ? (
+                        <div className="empty">
+                            <img src="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png" alt="" />
+                            <h2 className="h-md mt12">Create your first widget</h2>
+                            <p className="sm sub mt4">Build custom forms and text widgets to enhance your store.</p>
+                            <button type="button" className="btn primary mt16" onClick={handleCreateNew}>
+                                Create widget
+                            </button>
+                        </div>
+                    ) : (
                         <>
-                            <Button onClick={() => { setDeleteModalActive(false); setFormToDelete(null); }} disabled={isCreating}>Cancel</Button>
-                            <Button variant="primary" tone="critical" onClick={handleDeleteConfirm} disabled={isCreating} loading={isCreating}>
-                                Delete
-                            </Button>
-                        </>,
-                    )}
-                </BlockStack>
-                <TitleBar title="Delete widget" />
-            </Modal>
+                            {selected.length > 0 ? (
+                                <div className="bulk">
+                                    <span className="sm strong">{selected.length} selected</span>
+                                    <button type="button" className="btn" onClick={handleBulkActivate}>
+                                        Activate
+                                    </button>
+                                    <button type="button" className="btn" onClick={handleBulkDeactivate}>
+                                        Deactivate
+                                    </button>
+                                    <button type="button" className="btn wd-danger" onClick={() => setBulkDeleteModalActive(true)}>
+                                        Delete
+                                    </button>
+                                    <button type="button" className="btn plain" onClick={clearSelection} style={{ marginLeft: 'auto' }}>
+                                        Clear
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="filters">
+                                    <div className="tabs" role="tablist">
+                                        {[
+                                            ['all', 'All'],
+                                            ['form', 'Form'],
+                                            ['text', 'Text'],
+                                        ].map(([value, label]) => (
+                                            <button
+                                                type="button"
+                                                key={value}
+                                                role="tab"
+                                                aria-selected={kindTab === value}
+                                                className={`tab${kindTab === value ? ' on' : ''}`}
+                                                onClick={() => setKindTab(value)}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <label className="searchbar">
+                                        {Ico.search}
+                                        <input
+                                            type="search"
+                                            value={queryValue}
+                                            onChange={(e) => setQueryValue(e.target.value)}
+                                            placeholder="Search widgets…"
+                                            aria-label="Search widgets"
+                                        />
+                                    </label>
+                                    <Popover
+                                        active={filterOpen}
+                                        onClose={() => setFilterOpen(false)}
+                                        preferredAlignment="right"
+                                        activator={
+                                            <button type="button" className="btn" onClick={() => setFilterOpen((o) => !o)} aria-expanded={filterOpen}>
+                                                Filter{filterCount > 0 ? ` (${filterCount})` : ''}
+                                            </button>
+                                        }
+                                    >
+                                        <Box padding="300" minWidth="220px">
+                                            <BlockStack gap="300">
+                                                <ChoiceList
+                                                    title="Status"
+                                                    choices={[
+                                                        { label: 'Active', value: 'active' },
+                                                        { label: 'Inactive', value: 'deactive' },
+                                                    ]}
+                                                    selected={statusFilter}
+                                                    onChange={setStatusFilter}
+                                                    allowMultiple
+                                                />
+                                                <ChoiceList
+                                                    title="Created date"
+                                                    choices={Object.entries(DATE_LABELS).map(([value, label]) => ({ value, label }))}
+                                                    selected={dateFilter}
+                                                    onChange={setDateFilter}
+                                                    allowMultiple
+                                                />
+                                                {filterCount > 0 && (
+                                                    <Button
+                                                        variant="plain"
+                                                        onClick={() => {
+                                                            setStatusFilter([]);
+                                                            setDateFilter([]);
+                                                        }}
+                                                    >
+                                                        Clear filters
+                                                    </Button>
+                                                )}
+                                            </BlockStack>
+                                        </Box>
+                                    </Popover>
+                                    <select className="select wd-sort" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort widgets">
+                                        {SORTS.map((s) => (
+                                            <option key={s.value} value={s.value}>
+                                                Sort: {s.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
-            {/* Bulk delete modal */}
-            <Modal id="bulk-delete-modal" open={bulkDeleteModalActive}>
+                            <div className="t-scroll">
+                                <table className="idx">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: 26 }}>
+                                                <Checkbox
+                                                    checked={allSelected}
+                                                    indeterminate={someSelected}
+                                                    onChange={toggleAll}
+                                                    label="Select all widgets"
+                                                />
+                                            </th>
+                                            <th>Widget name</th>
+                                            <th>Design</th>
+                                            <th>Used by</th>
+                                            <th>Created</th>
+                                            <th>Status</th>
+                                            <th className="end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {rows.length > 0 ? (
+                                            rows
+                                        ) : (
+                                            <tr className="t-none">
+                                                <td colSpan={7}>
+                                                    <p className="sm sub">No widgets found matching your criteria.</p>
+                                                    {filtersActive && (
+                                                        <button type="button" className="btn mt8" onClick={handleFiltersClearAll}>
+                                                            Clear filters
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {filteredForms.length > ITEMS_PER_PAGE && (
+                                <div className="pager">
+                                    <button
+                                        type="button"
+                                        className="btn icon"
+                                        aria-label="Previous page"
+                                        disabled={page <= 1}
+                                        onClick={() => setCurrentPage(Math.max(page - 1, 1))}
+                                    >
+                                        &lsaquo;
+                                    </button>
+                                    <span className="sm sub">
+                                        {page} of {totalPages}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="btn icon"
+                                        aria-label="Next page"
+                                        disabled={page >= totalPages}
+                                        onClick={() => setCurrentPage(Math.min(page + 1, totalPages))}
+                                    >
+                                        &rsaquo;
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            </main>
+
+            {/* Delete one widget */}
+            <Modal id="delete-form-modal" open={deleteModalActive} onHide={() => setDeleteModalActive(false)}>
                 <BlockStack gap="0">
                     <Box padding="400">
                         <BlockStack gap="400">
                             <Text as="p" variant="bodyMd">
-                                Are you sure you want to delete {selectedResources.length} selected widget{selectedResources.length > 1 ? 's' : ''}?
+                                Are you sure you want to delete &ldquo;{formToDelete?.name}&rdquo;?
                             </Text>
-                            <Banner tone="warning">This action cannot be undone. All data will be permanently deleted.</Banner>
+                            <Text as="p" variant="bodyMd" tone="subdued">
+                                {deleteUsed
+                                    ? `${countLabel(deleteUsed, 'locks')} use${deleteUsed === 1 ? 's' : ''} it. They fall back to the default look, and keep working.`
+                                    : 'Nothing is using it, so nothing changes on your storefront.'}
+                            </Text>
+                            <Banner tone="warning">This action cannot be undone.</Banner>
                         </BlockStack>
                     </Box>
                     {renderModalFooter(
                         <>
-                            <Button onClick={() => setBulkDeleteModalActive(false)} disabled={isCreating}>Cancel</Button>
-                            <Button variant="primary" tone="critical" onClick={handleBulkDeleteConfirm} disabled={isCreating} loading={isCreating}>
-                                Delete {selectedResources.length} widget{selectedResources.length > 1 ? 's' : ''}
+                            <Button
+                                onClick={() => {
+                                    setDeleteModalActive(false);
+                                    setFormToDelete(null);
+                                }}
+                                disabled={busy}
+                            >
+                                Cancel
+                            </Button>
+                            <Button variant="primary" tone="critical" onClick={handleDeleteConfirm} disabled={busy} loading={busy}>
+                                Delete widget
+                            </Button>
+                        </>,
+                    )}
+                </BlockStack>
+                <TitleBar title="Delete this widget?" />
+            </Modal>
+
+            {/* Delete the selection */}
+            <Modal id="bulk-delete-modal" open={bulkDeleteModalActive} onHide={() => setBulkDeleteModalActive(false)}>
+                <BlockStack gap="0">
+                    <Box padding="400">
+                        <BlockStack gap="400">
+                            <Text as="p" variant="bodyMd">
+                                Are you sure you want to delete {selected.length} selected widget{selected.length === 1 ? '' : 's'}?
+                            </Text>
+                            {selectedUsedBy > 0 && (
+                                <Text as="p" variant="bodyMd" tone="subdued">
+                                    Locks using them fall back to the default look, and keep working.
+                                </Text>
+                            )}
+                            <Banner tone="warning">This action cannot be undone.</Banner>
+                        </BlockStack>
+                    </Box>
+                    {renderModalFooter(
+                        <>
+                            <Button onClick={() => setBulkDeleteModalActive(false)} disabled={busy}>
+                                Cancel
+                            </Button>
+                            <Button variant="primary" tone="critical" onClick={handleBulkDeleteConfirm} disabled={busy} loading={busy}>
+                                Delete {selected.length} widget{selected.length === 1 ? '' : 's'}
                             </Button>
                         </>,
                     )}
@@ -924,23 +765,9 @@ export default function FormsDashboard() {
                 <TitleBar title="Delete selected widgets" />
             </Modal>
 
-            {/* Multi-step create modal */}
-            <Modal id="create-widget-modal" open={createModalOpen} variant="max">
-                {renderCreateModalContent()}
-                <TitleBar title={createStep === 3 ? `Create: ${newWidgetName}` : 'Create New Widget'} />
-            </Modal>
-
-            {/* Edit widget modal */}
-            <Modal id="edit-widget-modal" open={editModalOpen} variant="max">
-                {renderEditModalContent()}
-                <TitleBar title={`Edit: ${formToEdit?.name || 'Widget'}`}>
-                    <button onClick={() => { setEditModalOpen(false); setFormToEdit(null); }} disabled={isCreating}>Cancel</button>
-                </TitleBar>
-            </Modal>
-
-            {/* Preview modal */}
+            {/* Preview — opened from a row's colours */}
             {previewModalOpen && (
-                <Modal id="preview-form-modal" open={previewModalOpen} onClose={handleClosePreview} key={formToPreview?.id || 'preview-modal'} variant="max">
+                <Modal id="preview-form-modal" open={previewModalOpen} onHide={handleClosePreview} key={formToPreview?.id || 'preview-modal'} variant="max">
                     <FormPreviewModal
                         formData={formToPreview?.formData}
                         textData={formToPreview?.textData}
@@ -951,10 +778,19 @@ export default function FormsDashboard() {
                         primaryLocale={primaryLocale}
                     />
                     <TitleBar title={`Preview: ${formToPreview?.name || 'Widget'}`}>
+                        <button
+                            onClick={() => {
+                                const form = formToPreview;
+                                handleClosePreview();
+                                if (form) handleEdit(form);
+                            }}
+                        >
+                            Edit
+                        </button>
                         <button onClick={handleClosePreview}>Close</button>
                     </TitleBar>
                 </Modal>
             )}
-        </>
+        </div>
     );
 }

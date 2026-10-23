@@ -1,0 +1,4 @@
+/* Where Polaris components still render inside an Airo page, keep them on
+   the same rules as the design system: black acts, the accent marks. */
+.airo .Polaris-Button--variantPrimary { --pc-button-bg: var(--btn-bg); --pc-button-bg-hover: var(--btn-bg-strong); }
+.airo .Polaris-Link { color: var(--link); }

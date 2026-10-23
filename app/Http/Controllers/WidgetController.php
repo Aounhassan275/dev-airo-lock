@@ -114,12 +114,37 @@ class WidgetController extends Controller
         $lockController->updateGlobalMetafield($shop);
     }
 
+    /**
+     * The locks using each widget, keyed by widget id. A widget is shared, so
+     * the list and the editor both say who is relying on one.
+     *
+     * @return array<int, array<int, array{id: string, name: string}>>
+     */
+    private function locksByWidget(): array
+    {
+        $byWidget = [];
+
+        Lock::where('shop_id', Auth::id())
+            ->orderBy('name')
+            ->get(['id', 'name', 'widget_id', 'text_widget_id'])
+            ->each(function ($lock) use (&$byWidget) {
+                $entry = ['id' => (string) $lock->id, 'name' => (string) $lock->name];
+                foreach (array_unique(array_filter([$lock->widget_id, $lock->text_widget_id])) as $widgetId) {
+                    $byWidget[(int) $widgetId][] = $entry;
+                }
+            });
+
+        return $byWidget;
+    }
+
     public function index()
     {
+        $locksByWidget = $this->locksByWidget();
+
         $widgets = Widget::where('user_id', Auth::id())
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($widget) {
+            ->map(function ($widget) use ($locksByWidget) {
                 return [
                     'id' => (string) $widget->id,
                     'name' => $widget->name,
@@ -130,6 +155,7 @@ class WidgetController extends Controller
                     'submissions' => 0,  // Placeholder for future implementation
                     'formData' => $widget->type === 'form' ? $widget->configuration : null,
                     'textData' => $widget->type === 'text' ? $widget->configuration : null,
+                    'usedBy' => $locksByWidget[(int) $widget->id] ?? [],
                 ];
             });
 
@@ -347,10 +373,36 @@ class WidgetController extends Controller
         return redirect()->route('widgetdashboard')->with('success', 'Widget deleted successfully!');
     }
 
-    public function widgets()
+    /**
+     * The widget page: /widgets creates one, /widgets?id={widget} edits one.
+     */
+    public function widgets(Request $request)
     {
+        $widget = null;
+
+        if ($request->filled('id')) {
+            $model = Widget::where('user_id', Auth::id())->find($request->query('id'));
+
+            if ($model) {
+                $widget = [
+                    'id' => (string) $model->id,
+                    'name' => $model->name,
+                    'type' => $model->type,
+                    'status' => $model->is_active ? 'active' : 'deactive',
+                    'configuration' => $model->configuration,
+                    'createdAt' => $model->created_at->toISOString(),
+                    'usedBy' => $this->locksByWidget()[(int) $model->id] ?? [],
+                ];
+            }
+        }
+
+        $locales = app(ShopLocaleService::class)->get(Auth::user());
+
         return Inertia::render('widget/Widgets', [
             'submitRoute' => route('widgets.store'),
+            'widget' => $widget,
+            'storeLocales' => $locales['locales'],
+            'primaryLocale' => $locales['primary'],
         ]);
     }
 

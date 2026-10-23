@@ -1,0 +1,107 @@
+/* Widget list (/widgetdashboard). Every selector is scoped to .pg-widgets
+   because every page's CSS is loaded on every page. */
+
+/* One summary of one library, so one card — divided, not scattered, and the
+   same card the lock list carries. */
+.pg-widgets .stat-row {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    background: #fff; border: 1px solid var(--p-border-soft); border-radius: 12px;
+    box-shadow: var(--p-card-shadow); overflow: hidden; margin-bottom: 14px;
+}
+/* airo.css gives .stat its own border, radius and shadow for a grid of
+   separate cards; inside one card they all come off. */
+.pg-widgets .stat-row .stat {
+    border: 0; border-radius: 0; box-shadow: none; background: transparent;
+    padding: 13px 16px; display: flex; align-items: center; gap: 12px;
+}
+.pg-widgets .stat-row .stat:hover { border-color: transparent; box-shadow: none; }
+.pg-widgets .stat-row .stat + .stat { border-left: 1px solid var(--p-border-soft); }
+.pg-widgets .stat-ico {
+    width: 32px; height: 32px; border-radius: 9px; background: #f1f1f1;
+    border: 0; display: grid; place-items: center; flex: none; color: var(--ink-1);
+}
+.pg-widgets .stat-ico svg { width: 17px; height: 17px; display: block; }
+.pg-widgets .stat-ico.form { background: var(--p-info-bg); color: var(--p-info-fg); }
+.pg-widgets .stat-ico.text { background: var(--p-success-bg); color: var(--p-success-fg); }
+.pg-widgets .stat-v { font-size: 21px; font-weight: 700; line-height: 25px; display: block;
+                      letter-spacing: -.015em; color: var(--p-text); }
+.pg-widgets .stat-l { display: block; font-size: 12.5px; font-weight: 550; color: var(--p-text); }
+.pg-widgets .stat-note { display: block; font-size: 11.5px; color: var(--p-text-sub); margin-top: 2px; }
+
+/* A list of designs that shows them: the colours a widget is made of, in
+   the order the editor applies them. The row opens the preview. */
+.pg-widgets .sw-row {
+    display: inline-flex; gap: 3px; padding: 3px; margin: -3px; border: 0; border-radius: 6px;
+    background: transparent; cursor: pointer;
+}
+.pg-widgets .sw-row:hover { background: #f1f1f1; }
+.pg-widgets .sw-row i {
+    display: block; width: 15px; height: 15px; border-radius: 4px;
+    /* A white swatch on a white row needs an outline to exist at all. */
+    border: 1px solid rgba(0, 0, 0, .22);
+}
+/* A text widget has no button: the slot says so instead of inventing a colour. */
+.pg-widgets .sw-row i.none { border-style: dashed; border-color: rgba(0, 0, 0, .2); background: transparent; }
+
+.pg-widgets .wd-name a { color: var(--p-text); text-decoration: none; }
+.pg-widgets .wd-name a:hover { text-decoration: underline; }
+.pg-widgets .wd-name .tag { margin-left: 0; }
+.pg-widgets .wd-id { color: var(--p-text-disabled); }
+
+/* A search box takes what it needs, not what the row has left over. */
+.pg-widgets .filters .searchbar { max-width: 420px; flex: 1 1 268px; cursor: text; }
+.pg-widgets .searchbar input {
+    border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px;
+    width: 100%; min-width: 0; color: var(--p-text); padding: 0; box-shadow: none;
+}
+.pg-widgets .searchbar input::-webkit-search-cancel-button { cursor: pointer; }
+.pg-widgets .searchbar:focus-within { border-color: var(--accent); outline: 1px solid var(--accent); }
+.pg-widgets .filters .wd-sort { width: auto; flex: none; }
+@media (max-width: 760px) {
+    .pg-widgets .filters { flex-wrap: wrap; }
+    .pg-widgets .filters .tabs { order: 1; }
+    .pg-widgets .filters > .btn,
+    .pg-widgets .filters > div:not(.tabs),
+    .pg-widgets .filters .wd-sort { order: 2; }
+    .pg-widgets .filters .wd-sort { margin-left: 0; }
+    .pg-widgets .filters .searchbar { order: 3; flex: 1 0 100%; max-width: none; }
+}
+
+/* The bulk row replaces the filters while a selection exists. */
+.pg-widgets .bulk {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px;
+    border-bottom: 1px solid var(--p-border-soft); background: var(--v-50, #fafafa);
+}
+.pg-widgets .bulk .wd-danger { color: var(--p-critical-fg); }
+
+/* The frame is about 293px narrower than the window, so the table has the
+   room for its columns from roughly 1200px up; below that it scrolls rather
+   than squeezing every cell into two lines. */
+.pg-widgets .t-scroll { overflow-x: auto; }
+.pg-widgets .t-scroll .idx { min-width: 860px; }
+@media (min-width: 1200px) { .pg-widgets .t-scroll .idx { min-width: 0; } }
+.pg-widgets .idx td { padding-top: 8px; padding-bottom: 8px; }
+.pg-widgets .idx input[type="checkbox"] { cursor: pointer; margin: 0; }
+.pg-widgets .idx tr.sel td { background: #f7f7f7; }
+.pg-widgets .t-none td { padding: 34px 16px; text-align: center; }
+.pg-widgets .t-none:hover td { background: transparent; }
+.pg-widgets .knob[disabled] { opacity: .5; cursor: wait; }
+
+.pg-widgets .pager {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 10px; border-top: 1px solid var(--p-border-soft);
+}
+.pg-widgets .pager .btn { font-size: 16px; line-height: 1; }
+
+.pg-widgets .empty h2 { font-size: 14px; }
+
+@media (max-width: 1180px) { .pg-widgets .stat-note { display: none; } }
+@media (max-width: 760px) {
+    .pg-widgets .stat-row { grid-template-columns: 1fr 1fr; }
+    /* Three cells over two columns: the odd one takes the second row rather
+       than leaving half of it blank. */
+    .pg-widgets .stat-row .stat:nth-child(3) {
+        grid-column: 1 / -1; border-left: 0;
+        border-top: 1px solid var(--p-border-soft);
+    }
+}

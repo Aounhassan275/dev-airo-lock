@@ -4,7 +4,7 @@ client_id = "fbfdecb30b5f0f83046ea52082889c72"
 name = "Airo Access Lock & Control"
 application_url = "https://dev-lock.airoapps.com/"
 embedded = true
-handle = "acesslock-1"
+handle = "dev-airo-access-lock-1"
 
 
 

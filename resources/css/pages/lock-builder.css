@@ -1,0 +1,147 @@
+/* Lock builder — /lock/create and /lock/{lock}/configure (one page).
+   Ported from design-mockup-ink/lock-builder.html. Every selector is scoped
+   to .pg-lock-builder because every page's CSS is loaded on every page. The
+   shared pieces (.one, .sec-c, .opts2, .acts, .crow, .seg, .stage, .osums …)
+   come from airo.css; this file is only what the page adds. */
+
+/* The modals render in a portal, outside the page root, so their bodies
+   carry the scope themselves — without the page's grey. */
+.pg-lock-builder.lb-modal { background: transparent; }
+.pg-lock-builder.lb-foot { font-size: 12px; color: var(--p-text-sub); }
+
+/* The rail stays beside whatever you are changing. */
+.pg-lock-builder .one-rail { top: 14px; }
+.pg-lock-builder .lb-needs { margin-top: 10px; padding: 0 4px; }
+
+/* --------------------------------------------------------- section 1 -- */
+.pg-lock-builder .lb-narrow { max-width: 430px; }
+.pg-lock-builder .lb-rule { margin: 14px 0; }
+.pg-lock-builder .lb-l { display: block; margin-bottom: 7px; }
+.pg-lock-builder .lb-actions { max-width: 560px; }
+.pg-lock-builder .lb-price { max-width: 480px; }
+.pg-lock-builder .opt-t .tag,
+.pg-lock-builder .opt-t span[title] { margin-left: 4px; }
+
+/* What is chosen, one chip each, removable without opening the picker. */
+.pg-lock-builder .lb-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.pg-lock-builder .lb-chip {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 260px;
+    padding: 3px 4px 3px 10px; border: 1px solid var(--p-border); border-radius: 999px;
+    background: #fff; font-size: 12px;
+}
+.pg-lock-builder .lb-chip-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pg-lock-builder .lb-chip-x {
+    width: 20px; height: 20px; border-radius: 50%; border: 0; flex: none; display: grid;
+    place-items: center; background: transparent; color: var(--p-text-disabled); cursor: pointer;
+}
+.pg-lock-builder .lb-chip-x:hover { background: var(--p-critical-bg); color: var(--p-critical-fg); }
+
+/* Warnings about the selection: the notice box, in the warning colour. */
+.pg-lock-builder .notice { align-items: flex-start; }
+.pg-lock-builder .notice.lb-warn {
+    background: var(--p-warning-bg); border-color: #f5d9a8; color: var(--p-warning-fg);
+}
+.pg-lock-builder .lb-notice-ic { flex: none; display: grid; margin-top: 1px; }
+.pg-lock-builder .lb-notice-ic svg { width: 15px; height: 15px; }
+
+/* Per-product variants: a row per product, opening to its variants. */
+.pg-lock-builder .lb-variants { margin-top: 14px; }
+.pg-lock-builder .lb-variants > .help { margin-bottom: 8px; }
+.pg-lock-builder .lb-vrow { border: 1px solid var(--p-border); border-radius: 10px; margin-bottom: 6px; background: #fff; }
+.pg-lock-builder .lb-vrow-h {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 11px;
+    border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer;
+}
+.pg-lock-builder .lb-vrow-c { display: grid; color: var(--p-text-disabled); transition: transform .12s; }
+.pg-lock-builder .lb-vrow-c svg { width: 14px; height: 14px; }
+.pg-lock-builder .lb-vrow.open .lb-vrow-c { transform: rotate(180deg); }
+.pg-lock-builder .lb-vrow-b {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px 14px;
+    padding: 4px 11px 11px; border-top: 1px solid var(--p-border-soft); padding-top: 10px;
+}
+
+/* --------------------------------------------------------- section 2 -- */
+.pg-lock-builder .lb-ophelp { margin-bottom: 11px; }
+.pg-lock-builder .addtile:disabled { opacity: .5; cursor: not-allowed; }
+.pg-lock-builder .crow .tag { margin-left: 0; }
+
+/* --------------------------------------------------------- section 3 -- */
+.pg-lock-builder .sec-c.off .sec-t2 { color: var(--p-text-sub); }
+.pg-lock-builder .sec-hd .tag { margin-left: 0; }
+.pg-lock-builder .lb-designs { display: flex; flex-direction: column; gap: 14px; }
+.pg-lock-builder .lb-designs:empty { display: none; }
+.pg-lock-builder .lb-word-head { margin-top: 12px; margin-bottom: 4px; }
+.pg-lock-builder .select.lb-mini { padding: 4px 9px; font-size: 12px; }
+.pg-lock-builder .select.lb-auto { width: auto; }
+.pg-lock-builder .lb-undo { color: var(--p-critical-fg); flex: none; }
+
+/* The device says why there is no popup when the action hides the content. */
+.pg-lock-builder .lb-nopop {
+    border: 1px dashed #6e6e6e; border-radius: 10px; padding: 14px; background: rgba(255, 255, 255, .9);
+    text-align: center; color: #6e6e6e; font-size: 10.5px; line-height: 1.4;
+}
+
+/* --------------------------------------------------------- section 4 -- */
+.pg-lock-builder .input.lb-time { width: 120px; flex: none; }
+.pg-lock-builder .sect .sec-l span[title] { margin-left: 6px; }
+
+/* --------------------------------------------------------- the embed -- */
+/* One row, not the full-page block the setup flow's last step uses: here it
+   is one of five sections rather than the only thing being asked. */
+.pg-lock-builder .lb-embed { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pg-lock-builder .lb-embed-ic {
+    width: 38px; height: 38px; border-radius: 11px; flex: none; display: grid;
+    place-items: center; background: var(--p-warning-bg); color: var(--p-warning-fg);
+}
+.pg-lock-builder .lb-embed.on .lb-embed-ic { background: var(--p-success-bg); color: var(--p-success-fg); }
+.pg-lock-builder .lb-embed-ic svg { width: 20px; height: 20px; }
+.pg-lock-builder .lb-embed-t { display: block; font-size: 13.5px; font-weight: 650; }
+.pg-lock-builder .lb-embed-d { display: block; font-size: 12.5px; color: var(--p-text-sub); margin-top: 2px; }
+.pg-lock-builder .lb-embed-act { margin-left: auto; }
+.pg-lock-builder .lb-embed-act a.btn { text-decoration: none; }
+.pg-lock-builder .lb-embed-act a.btn.primary { color: #fff; }
+.pg-lock-builder .lb-embed-note {
+    display: block; font-size: 11.5px; color: var(--p-text-disabled); margin-top: 10px; line-height: 1.4;
+}
+.pg-lock-builder .lb-howto {
+    list-style: none; margin: 14px 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+}
+.pg-lock-builder .lb-howto li {
+    display: flex; align-items: flex-start; gap: 9px; font-size: 12px; line-height: 1.4;
+    padding: 10px 11px; border: 1px solid var(--p-border-soft); border-radius: 10px;
+}
+.pg-lock-builder .lb-howto-n {
+    width: 19px; height: 19px; border-radius: 50%; flex: none; display: grid;
+    place-items: center; font-size: 10.5px; font-weight: 700;
+    background: var(--v-50); color: var(--accent-deep);
+}
+.pg-lock-builder .btn.syncing { cursor: progress; }
+
+/* ------------------------------------------------------- item picker -- */
+.pg-lock-builder.lb-picker .lb-pick-search {
+    padding: 13px 16px; background: #fafafa; border-bottom: 1px solid var(--p-border-soft);
+}
+.pg-lock-builder .lb-searchbar { background: #fff; cursor: text; }
+.pg-lock-builder .lb-searchbar input {
+    flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
+    font: inherit; font-size: 13px; color: var(--p-text);
+}
+.pg-lock-builder .lb-filter-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.pg-lock-builder .lb-pick-list { max-height: 400px; }
+.pg-lock-builder .pick-row input[type="checkbox"] { margin: 0; flex: none; accent-color: var(--accent); }
+.pg-lock-builder .lb-thumb-img { overflow: hidden; }
+.pg-lock-builder .lb-thumb-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pg-lock-builder .pick-row .badge { white-space: nowrap; }
+.pg-lock-builder .lb-pick-pages { display: flex; justify-content: center; padding: 10px 16px; border-top: 1px solid var(--p-border-soft); }
+.pg-lock-builder .lb-pick-warn { padding: 12px 16px; border-top: 1px solid var(--p-border-soft); }
+.pg-lock-builder .syncing .pick-sync svg { animation: lb-spin .7s linear infinite; }
+
+@keyframes lb-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 760px) {
+    .pg-lock-builder .lb-howto { grid-template-columns: 1fr; }
+    .pg-lock-builder .lb-embed-act { margin-left: 0; width: 100%; }
+    .pg-lock-builder .opts2 { grid-template-columns: 1fr; }
+    .pg-lock-builder .sec-hd { flex-wrap: wrap; }
+}

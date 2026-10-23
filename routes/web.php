@@ -34,6 +34,7 @@ Route::middleware(['verify.shopify', 'plan.gate', 'onboard'])->group(function ()
     // Dashboard routes
     Route::controller(DashboardController::class)->group(function () {
         Route::get('/', 'index')->name('home');
+        Route::get('/locks', 'locks')->name('locks.index');
         Route::put('/locks/{lock}/status', 'updateStatus')->name('locks.updateStatus');
         Route::delete('/locks/{lock}', 'destroy')->name('locks.destroy');
         Route::post('/locks/bulk-activate', 'bulkActivate')->name('locks.bulkActivate');

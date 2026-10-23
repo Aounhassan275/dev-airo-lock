@@ -1,53 +1,89 @@
 import { router, usePage } from '@inertiajs/react';
-import { Page, Text } from '@shopify/polaris';
-import { Check, Crown, Lock, Shield, Sparkles, Star, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import '../../css/pages/plans.css';
 
-// Icon + fallback features per tier. Feature lists normally come from the
-// backend (plans.features JSON, managed in the admin panel); these are only
-// used when a plan row has none.
-const PLAN_META = {
-    Basic: {
-        icon: Zap,
-        tagline: 'Perfect for getting started',
-        fallbackFeatures: [
-            'Lock products, collections, pages & blogs',
-            'Passcode & sign-in access rules',
-            'Email support',
-        ],
-    },
-    Pro: {
-        icon: Sparkles,
-        tagline: 'Most popular for growing stores',
-        fallbackFeatures: [
-            'Everything in Basic',
-            'Secret links & customer tag access',
-            'Hide prices from guests',
-            'Scheduled locks & variant locking',
-            'Priority email support',
-        ],
-    },
-    Unlimited: {
-        icon: Crown,
-        tagline: 'For enterprise-level control',
-        fallbackFeatures: [
-            'Everything in Pro',
-            'Unlimited content locks',
-            'Lock the entire store & checkout',
-            'Location & IP based rules',
-            'Dedicated priority support',
-        ],
-    },
+// ── Icons (inline strokes from design-mockup-ink/plans.html) ────────────────
+const IconBolt = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+        <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
+    </svg>
+);
+const IconShield = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z" />
+    </svg>
+);
+const IconStar = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3l1.9 4.6 5 .4-3.8 3.3 1.2 4.9L12 13.6 7.7 16.2l1.2-4.9L5.1 8l5-.4z" />
+    </svg>
+);
+const IconCrown = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 7l4 5 5-7 5 7 4-5v11H3z" />
+    </svg>
+);
+const Tick = ({ className = undefined, label = undefined }) => (
+    <svg
+        className={className}
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={className ? 'currentColor' : '#0c5132'}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden={label ? undefined : 'true'}
+        aria-label={label}
+        role={label ? 'img' : undefined}
+    >
+        <path d="M5 13l4 4L19 7" />
+    </svg>
+);
+const Chevron = ({ className }) => (
+    <svg className={className} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 9l6 6 6-6" />
+    </svg>
+);
+
+const PLAN_ICONS = { Free: IconBolt, Basic: IconShield, Pro: IconStar, Unlimited: IconCrown };
+
+const TRIAL_NOTE_KEY = 'airo.plans.trialNoteDismissed';
+
+const money = (n) => `$${Number(n || 0).toFixed(2)}`;
+
+// Server dates are 'YYYY-MM-DD'; read them as UTC so the day never shifts.
+const formatDate = (s) => {
+    if (!s) return null;
+    const d = new Date(`${String(s).slice(0, 10)}T00:00:00Z`);
+    if (Number.isNaN(d.getTime())) return s;
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 };
 
+const lockLabel = (maxLocks) =>
+    maxLocks === 0 ? 'Unlimited content locks' : maxLocks === 1 ? '1 content lock' : `Up to ${maxLocks} content locks`;
+
+const lockCount = (maxLocks) => (maxLocks === 0 ? 'Unlimited' : String(maxLocks));
+
 export default function Plans() {
-    const { plans, currentPlanId, billing } = usePage().props;
+    const { plans = [], currentPlanId, billing } = usePage().props;
 
     const [loadingPlanId, setLoadingPlanId] = useState(null);
     const [error, setError] = useState(null);
     // Downgrading from a paid plan to Free cancels the subscription
     // immediately (no Shopify approval screen), so it takes a second click.
     const [confirmingFreeId, setConfirmingFreeId] = useState(null);
+    const [compareOpen, setCompareOpen] = useState(false);
+    const [openFaq, setOpenFaq] = useState(null);
+    const [trialNoteHidden, setTrialNoteHidden] = useState(() => {
+        try {
+            return window.localStorage.getItem(TRIAL_NOTE_KEY) === '1';
+        } catch {
+            return false;
+        }
+    });
 
     // The App Bridge contextual save bar survives SPA navigation from the
     // lock builder — if one is still up when the merchant lands here (e.g.
@@ -58,15 +94,30 @@ export default function Plans() {
     }, []);
 
     // ── Detect which billing cycles actually exist in the DB ──────────────────
-    const hasAnnual = plans.some((p) => p.interval === 'ANNUAL');
-    const hasMonthly = plans.some((p) => p.interval === 'EVERY_30_DAYS');
+    const hasAnnual = plans.some((p) => p.interval === 'ANNUAL' && p.raw_price > 0);
+    const hasMonthly = plans.some((p) => p.interval === 'EVERY_30_DAYS' && p.raw_price > 0);
 
     // Default to the current plan's cycle; otherwise monthly.
     const currentPlan = plans.find((p) => p.id === currentPlanId);
-    // Rendered as a quiet strip below the paid grid — attention stays on paid plans.
     const freePlan = plans.find((p) => p.raw_price === 0) || null;
     const defaultCycle = currentPlan?.interval === 'ANNUAL' ? 'yearly' : hasMonthly ? 'monthly' : hasAnnual ? 'yearly' : 'monthly';
     const [billingCycle, setBillingCycle] = useState(defaultCycle);
+
+    const showToggle = hasMonthly && hasAnnual;
+
+    // The saving the "Annually" pill promises, computed from the real
+    // monthly/annual pairs (smallest one, so it never overclaims).
+    const annualSaving = useMemo(() => {
+        const pcts = plans
+            .filter((p) => p.interval === 'ANNUAL' && p.raw_price > 0)
+            .map((a) => {
+                const m = plans.find((p) => p.interval === 'EVERY_30_DAYS' && p.name === a.name && p.raw_price > 0);
+                return m ? 1 - a.raw_price / (m.raw_price * 12) : null;
+            })
+            .filter((x) => x !== null);
+        if (!pcts.length) return 0;
+        return Math.round(Math.min(...pcts) * 100);
+    }, [plans]);
 
     const handleSelectPlan = async (plan) => {
         const isFreeDowngrade = plan.raw_price === 0 && billing?.hasPlan && Number(billing.planPrice) > 0;
@@ -96,7 +147,7 @@ export default function Plans() {
 
             if (response.ok && data?.freePlanActivated) {
                 // Free plan is applied server-side with no approval screen —
-                // refresh the page props so the card flips to "Current Plan".
+                // refresh the page props so the card flips to "Current plan".
                 router.reload({ onFinish: () => setLoadingPlanId(null) });
             } else if (response.ok && data?.redirectUrl) {
                 // Off to Shopify's charge-approval screen (top-level, embedded admin).
@@ -105,530 +156,428 @@ export default function Plans() {
                 setError(data?.message || 'Failed to select plan. Please try again.');
                 setLoadingPlanId(null);
             }
-        } catch (err) {
+        } catch {
             setError('Failed to select plan. Please try again.');
             setLoadingPlanId(null);
         }
     };
 
     // ===== PLAN PROCESSING =====
-    const displayPlans = useMemo(() => {
-        let filtered = plans.filter((plan) => {
-            if (plan.raw_price === 0) return false; // Free renders as a quiet strip below the grid
+    // Free is the first card; the paid cards follow the billing period.
+    const cards = useMemo(() => {
+        let paid = plans.filter((plan) => {
+            if (plan.raw_price === 0) return false;
             if (billingCycle === 'monthly') return plan.interval === 'EVERY_30_DAYS';
             return plan.interval === 'ANNUAL';
         });
+        if (paid.length === 0) paid = plans.filter((p) => p.raw_price !== 0);
 
-        if (filtered.length === 0) {
-            filtered = plans;
-        }
+        const sorted = [...paid].sort((a, b) => (a.raw_price || 0) - (b.raw_price || 0));
+        const list = freePlan ? [freePlan, ...sorted] : sorted;
 
-        const sorted = [...filtered].sort((a, b) => (a.raw_price || 0) - (b.raw_price || 0));
-        const monthlyPlans = plans.filter((p) => p.interval === 'EVERY_30_DAYS');
+        return list.map((plan, i) => {
+            const isFree = plan.raw_price === 0;
+            const isAnnual = plan.interval === 'ANNUAL';
+            const features = plan.features || [];
+            const prev = i > 0 ? list[i - 1] : null;
+            const prevFeatures = prev?.features || [];
+            const inherits = prev && prevFeatures.length > 0 && prevFeatures.every((f) => features.includes(f));
 
-        if (billingCycle === 'yearly') {
-            return sorted.map((plan) => {
-                const monthlyEquivalent = (plan.raw_price || 0) / 12;
-                const monthlyPlan = monthlyPlans.find((m) => m.name === plan.name);
-
-                return {
-                    ...plan,
-                    displayPrice: `$${monthlyEquivalent.toFixed(2)}/month`,
-                    originalPrice: monthlyPlan ? `$${monthlyPlan.raw_price.toFixed(2)}` : null,
-                };
-            });
-        }
-
-        return sorted.map((plan) => ({
-            ...plan,
-            displayPrice: plan.price,
-            originalPrice: null,
-        }));
-    }, [plans, billingCycle]);
+            return {
+                ...plan,
+                isFree,
+                priceText: isFree ? '$0' : money(isAnnual ? plan.raw_price / 12 : plan.raw_price),
+                billText: isFree
+                    ? 'no card, no expiry'
+                    : isAnnual
+                        ? `billed yearly · ${money(plan.raw_price)} a year`
+                        : 'billed monthly',
+                inheritsFrom: inherits ? prev.name : null,
+                newFeatures: inherits ? features.filter((f) => !prevFeatures.includes(f)) : features,
+            };
+        });
+    }, [plans, billingCycle, freePlan]);
 
     const isCurrentPlan = (planId) => currentPlanId === planId;
 
-    const showToggle = hasMonthly && hasAnnual;
+    // One claim per card: the recommendation is the admin-flagged popular
+    // plan, otherwise the top tier — and never the plan you are already on.
+    const recommended = useMemo(() => {
+        const paid = cards.filter((c) => !c.isFree);
+        if (!paid.length) return null;
+        const flagged = paid.find((c) => c.is_popular);
+        if (flagged) return flagged.id === currentPlanId ? null : { id: flagged.id, label: 'Most popular' };
+        const top = paid[paid.length - 1];
+        return top.id === currentPlanId ? null : { id: top.id, label: 'Best value' };
+    }, [cards, currentPlanId]);
+
+    // The trial, stated once.
+    const trialDays = cards.filter((c) => !c.isFree).map((c) => c.trial_days || 0);
+    const maxTrial = trialDays.length ? Math.max(...trialDays) : 0;
+    const uniformTrial = maxTrial > 0 && trialDays.every((d) => d === maxTrial);
+
+    const dismissTrialNote = () => {
+        setTrialNoteHidden(true);
+        try {
+            window.localStorage.setItem(TRIAL_NOTE_KEY, '1');
+        } catch {
+            // Storage blocked — the note just comes back next visit.
+        }
+    };
+
+    // Compare table rows, built from the plans' own features and limits.
+    const compareRows = useMemo(() => {
+        const labels = [];
+        cards.forEach((c) => (c.features || []).forEach((f) => {
+            if (!labels.includes(f)) labels.push(f);
+        }));
+        return labels;
+    }, [cards]);
 
     // Usage strip data (shared billing prop from the backend).
     const usage = billing || null;
+    const showUsage = usage && (usage.hasPlan || usage.freeAccess);
+    const usageName = usage?.planName || (usage?.freeAccess ? 'Free access' : null);
+    const usageSub = (() => {
+        if (!usage) return null;
+        const price = Number(usage.planPrice) > 0
+            ? `${money(usage.planPrice)} a ${usage.planInterval === 'ANNUAL' ? 'year' : 'month'}`
+            : null;
+        let when = null;
+        if (usage.isTrial) {
+            when = `Free trial · ${usage.trialDaysRemaining} day${usage.trialDaysRemaining !== 1 ? 's' : ''} left`
+                + (usage.trialEndsOn ? ` · ends ${formatDate(usage.trialEndsOn)}` : '');
+        } else if (usage.billingOn) {
+            when = `Renews ${formatDate(usage.billingOn)}`;
+        } else if (usage.freeAccess && !usage.hasPlan) {
+            when = 'Complimentary access for this store';
+        } else if (usage.hasPlan && !(Number(usage.planPrice) > 0)) {
+            when = 'Free, no expiry';
+        }
+        return [price, when].filter(Boolean).join(' · ');
+    })();
+    const meterPct = usage && !usage.hasUnlimitedLocks && usage.maxLocks > 0
+        ? Math.min(100, Math.round((usage.locksUsed / usage.maxLocks) * 100))
+        : 0;
+
+    const paidToFree = billing?.hasPlan && Number(billing.planPrice) > 0;
+
+    const faqs = [
+        {
+            q: 'Do I have to edit my theme?',
+            a: <>No. Airo runs through a theme app embed &mdash; you switch it on once in the theme editor, and setup links you straight to it.</>,
+        },
+        {
+            q: 'How am I billed?',
+            a: <>Through Shopify. The charge appears on your Shopify invoice{maxTrial > 0
+                ? (uniformTrial
+                    ? `, and every paid plan starts with a ${maxTrial}-day free trial`
+                    : `, and paid plans start with a free trial of up to ${maxTrial} days`)
+                : ''}.</>,
+        },
+        {
+            q: 'What happens if I downgrade?',
+            a: <>Nothing is deleted. A plan sets how many locks you can have; past that the app stops you creating more rather than removing what you already built.</>,
+        },
+        {
+            q: 'Will Google index a locked page?',
+            a: <>Only if you let it. Each lock has <strong>Hide from search engines</strong>, which adds a noindex tag to the page it protects.</>,
+        },
+        {
+            q: 'Can several locks share one design?',
+            a: <>Yes. A widget holds the colours and shape, and any lock can use it &mdash; while the wording can still differ lock by lock.</>,
+        },
+        {
+            q: 'Does it work at checkout?',
+            a: <>On Shopify Plus, yes: a checkout block shows the lock&rsquo;s message, and a validation function stops the order being placed.</>,
+        },
+    ];
+
+    const renderButton = (plan, isCurrent) => {
+        if (isCurrent) {
+            return (
+                <button type="button" className="btn full have mt16" aria-disabled="true">
+                    Your current plan
+                </button>
+            );
+        }
+        const confirming = confirmingFreeId === plan.id;
+        return (
+            <button
+                type="button"
+                className={`btn full mt16 ${confirming ? 'warn' : 'primary'}`}
+                onClick={() => handleSelectPlan(plan)}
+                disabled={loadingPlanId !== null}
+            >
+                {loadingPlanId === plan.id ? (
+                    <><span className="btn-spin" aria-hidden="true" /> Processing&hellip;</>
+                ) : confirming ? 'Confirm switch to Free'
+                    : plan.isFree ? 'Start free'
+                    : 'Select plan'}
+            </button>
+        );
+    };
 
     return (
-        <Page>
-            <style>{`
-                @keyframes planSlideUp {
-                    from { opacity: 0; transform: translateY(24px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                @keyframes spin {
-                    from { transform: rotate(0deg); }
-                    to { transform: rotate(360deg); }
-                }
-                .plan-card-new {
-                    animation: planSlideUp 0.5s ease-out forwards;
-                    opacity: 0;
-                }
-                .plan-card-new:nth-child(1) { animation-delay: 0.08s; }
-                .plan-card-new:nth-child(2) { animation-delay: 0.16s; }
-                .plan-card-new:nth-child(3) { animation-delay: 0.24s; }
-                .plan-card-new:nth-child(4) { animation-delay: 0.32s; }
-                .plan-cta-btn {
-                    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-                    position: relative;
-                    overflow: hidden;
-                }
-                .plan-cta-btn::after {
-                    content: '';
-                    position: absolute;
-                    inset: 0;
-                    background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
-                    transform: translateX(-100%);
-                    transition: transform 0.5s;
-                }
-                .plan-cta-btn:hover::after { transform: translateX(100%); }
-                .plan-cta-btn:hover:not(:disabled) {
-                    transform: translateY(-2px);
-                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-                }
-                .plan-cta-btn:active:not(:disabled) { transform: translateY(0); }
-                .plans-page-wrapper * { box-sizing: border-box !important; }
-                .plans-page-wrapper { color: #111827 !important; }
-            `}</style>
+        <div className="airo pg-plans">
+            <main className="page full">
 
-            <div className="plans-page-wrapper" style={{ minHeight: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
-
-                {/* ===== HEADER ===== */}
-                <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-                    <Text variant="headingXl" as="h1">Plans & Billing</Text>
-                    <div style={{ marginTop: '4px' }}>
-                        <Text variant="bodySm" tone="subdued">
-                            Choose the perfect plan for your store. Upgrade or downgrade anytime — billed securely through Shopify.
-                        </Text>
-                    </div>
+                <div className="center" style={{ marginBottom: 12 }}>
+                    <h1 className="plans-title">Subscriptions</h1>
+                    <p className="sub mt4 plans-lede">
+                        Choose the perfect plan for your store. Upgrade or downgrade anytime &mdash; billed securely through Shopify.
+                    </p>
                 </div>
 
-                {/* ===== CURRENT USAGE / TRIAL STRIP ===== */}
-                {usage && usage.hasPlan && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                        <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '18px',
-                            padding: '10px 20px',
-                            borderRadius: '12px',
-                            background: '#f5f3ff',
-                            border: '1px solid #ddd6fe',
-                            flexWrap: 'wrap',
-                            justifyContent: 'center',
-                        }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#5b21b6', fontWeight: 600 }}>
-                                <Crown size={13} />
-                                {usage.planName} plan{Number(usage.planPrice) > 0 ? ` · $${Number(usage.planPrice).toFixed(2)}${usage.planInterval === 'ANNUAL' ? '/year' : '/month'}` : ''}
-                            </span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#6b7280' }}>
-                                <Lock size={13} />
-                                {usage.hasUnlimitedLocks
-                                    ? `${usage.locksUsed} lock${usage.locksUsed !== 1 ? 's' : ''} · unlimited`
-                                    : `${usage.locksUsed} of ${usage.maxLocks} locks used`}
-                            </span>
-                            {usage.isTrial && (
-                                <span style={{ fontSize: '12px', color: '#8b5cf6', fontWeight: 600 }}>
-                                    Free trial — {usage.trialDaysRemaining} day{usage.trialDaysRemaining !== 1 ? 's' : ''} left
-                                </span>
-                            )}
-                            {!usage.isTrial && usage.billingOn && (
-                                <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                                    Next billing: {usage.billingOn}
-                                </span>
+                {/* What you are on, in the same card the lock list uses. */}
+                {showUsage && (
+                    <div className="usage">
+                        {usageName && <span className="usage-badge">{usageName}</span>}
+                        <div>
+                            <span className="usage-name">{usage.planName ? `${usage.planName} plan` : 'Free access'}</span>
+                            {usageSub && <span className="usage-sub">{usageSub}</span>}
+                        </div>
+                        <div className="usage-meter">
+                            {usage.hasUnlimitedLocks ? (
+                                <div className="between">
+                                    <span className="sm">
+                                        <strong>{usage.locksUsed}</strong> lock{usage.locksUsed !== 1 ? 's' : ''} in use
+                                    </span>
+                                    <span className="xs sub">Unlimited</span>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="between" style={{ marginBottom: 6 }}>
+                                        <span className="sm"><strong>{usage.locksUsed} of {usage.maxLocks}</strong> locks used</span>
+                                        <span className="xs sub">{usage.remainingLocks ?? 0} remaining</span>
+                                    </div>
+                                    <div className={`usage-bar${usage.limitReached ? ' full' : ''}`}>
+                                        <i style={{ width: `${meterPct}%` }} />
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>
                 )}
 
-                {/* ===== TEST MODE NOTICE ===== */}
-                {usage && usage.testMode && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                        <div style={{
-                            padding: '8px 16px',
-                            borderRadius: '10px',
-                            background: '#fffbeb',
-                            border: '1px solid #fde68a',
-                            color: '#92400e',
-                            fontSize: '12px',
-                            textAlign: 'center',
-                        }}>
+                {/* Test billing mode notice. */}
+                {usage?.testMode && (
+                    <div className="trial warn" role="status">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+                             strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M12 3l9.5 17h-19z" /><path d="M12 10v4M12 17.5v.01" />
+                        </svg>
+                        <span className="trial-d" style={{ marginTop: 0 }}>
                             {usage.isDevStore
                                 ? 'Development store — subscriptions here are created as Shopify TEST charges (you will not be billed).'
                                 : 'Test billing mode is enabled for this store — subscriptions are Shopify TEST charges.'}
-                        </div>
+                        </span>
                     </div>
                 )}
 
-                {/* ===== BILLING TOGGLE (only shown when both cycles exist) ===== */}
+                {/* The trial, said once at the top. */}
+                {maxTrial > 0 && !trialNoteHidden && (
+                    <div className="trial">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+                             strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9" /><path d="M12 8v4.5l3 1.8M12 16.5v.01" />
+                        </svg>
+                        <span>
+                            <span className="trial-t">
+                                {uniformTrial
+                                    ? `Every paid plan starts with ${maxTrial} days free`
+                                    : `Paid plans start with up to ${maxTrial} days free`}
+                            </span>
+                            <span className="trial-d">
+                                Shopify only charges you when it ends. Cancel before then and you pay nothing.
+                            </span>
+                        </span>
+                        <button type="button" className="btn" aria-label="Dismiss" onClick={dismissTrialNote}>&#10005;</button>
+                    </div>
+                )}
+
+                {error && (
+                    <div className="trial err" role="alert">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+                             strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.01" />
+                        </svg>
+                        <span className="trial-d" style={{ marginTop: 0 }}>{error}</span>
+                        <button type="button" className="btn" aria-label="Dismiss" onClick={() => setError(null)}>&#10005;</button>
+                    </div>
+                )}
+
                 {showToggle && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
-                        <div style={{
-                            display: 'inline-flex',
-                            padding: '2px',
-                            borderRadius: '50px',
-                            background: '#f3f4f6',
-                            border: '1px solid #e5e7eb',
-                        }}>
+                    <div className="row" style={{ justifyContent: 'center', marginBottom: 20 }}>
+                        <div className="cycle" role="group" aria-label="Billing period">
                             <button
+                                type="button"
+                                className={billingCycle === 'monthly' ? 'on' : ''}
+                                aria-pressed={billingCycle === 'monthly'}
                                 onClick={() => setBillingCycle('monthly')}
-                                style={{
-                                    padding: '2px 12px',
-                                    borderRadius: '50px',
-                                    border: 'none',
-                                    background: billingCycle === 'monthly' ? '#8b5cf6' : 'transparent',
-                                    color: billingCycle === 'monthly' ? '#ffffff' : '#6b7280',
-                                    fontWeight: 600,
-                                    fontSize: '11px',
-                                    cursor: 'pointer',
-                                    fontFamily: 'inherit',
-                                    transition: 'all 0.3s ease',
-                                }}
                             >
                                 Monthly
                             </button>
                             <button
+                                type="button"
+                                className={billingCycle === 'yearly' ? 'on' : ''}
+                                aria-pressed={billingCycle === 'yearly'}
                                 onClick={() => setBillingCycle('yearly')}
-                                style={{
-                                    padding: '2px 12px',
-                                    borderRadius: '50px',
-                                    border: 'none',
-                                    background: billingCycle === 'yearly' ? '#8b5cf6' : 'transparent',
-                                    color: billingCycle === 'yearly' ? '#ffffff' : '#6b7280',
-                                    fontWeight: 600,
-                                    fontSize: '11px',
-                                    cursor: 'pointer',
-                                    fontFamily: 'inherit',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.3s ease',
-                                }}
                             >
-                                Yearly
-                                <span style={{
-                                    background: billingCycle === 'yearly' ? 'rgba(255,255,255,0.25)' : '#8b5cf6',
-                                    color: '#ffffff',
-                                    padding: '1px 8px',
-                                    borderRadius: '20px',
-                                    fontSize: '9px',
-                                    fontWeight: 700,
-                                }}>
-                                    -17%
-                                </span>
+                                Annually
+                                {annualSaving > 0 && <span className="off-pill">&minus;{annualSaving}%</span>}
                             </button>
                         </div>
                     </div>
                 )}
 
-                {!showToggle && <div style={{ marginBottom: '30px' }} />}
-
-                {/* ===== ERROR ===== */}
-                {error && (
-                    <div style={{ maxWidth: '500px', margin: '0 auto 20px' }}>
-                        <div style={{
-                            padding: '10px 16px',
-                            borderRadius: '10px',
-                            background: '#fef2f2',
-                            border: '1px solid #fecaca',
-                            color: '#b91c1c',
-                            fontSize: '14px',
-                            textAlign: 'center',
-                        }}>
-                            {error}
-                        </div>
+                {cards.length === 0 ? (
+                    <div className="center sub" style={{ padding: 40, fontSize: 14 }}>
+                        No plans available. Please contact support.
                     </div>
-                )}
+                ) : (
+                    <div
+                        className={`plan-grid${cards.length >= 4 ? ' cols-4' : ''}`}
+                        style={{ '--plan-cols': Math.min(cards.length, 4) }}
+                    >
+                        {cards.map((plan) => {
+                            const isCurrent = isCurrentPlan(plan.id);
+                            const isBest = recommended?.id === plan.id;
+                            const Icon = PLAN_ICONS[plan.name] || (plan.isFree ? IconBolt : IconStar);
+                            const confirming = confirmingFreeId === plan.id;
 
-                {/* ===== CARDS GRID ===== */}
-                <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '0 16px' }}>
-                    {displayPlans.length === 0 ? (
-                        <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: '14px', padding: '40px' }}>
-                            No plans available. Please contact support.
-                        </div>
-                    ) : (
-                        <div style={{
-                            display: 'grid',
-                            gap: '16px',
-                            gridTemplateColumns: `repeat(${displayPlans.length}, minmax(220px, 1fr))`,
-                            maxWidth: `${displayPlans.length * 280}px`,
-                            width: '100%',
-                            alignItems: 'stretch',
-                        }}>
-                            {displayPlans.map((plan) => {
-                                const isCurrent = isCurrentPlan(plan.id);
-                                const isPopular = plan.is_popular;
-                                const planMeta = PLAN_META[plan.name] || PLAN_META['Basic'];
-                                const PlanIcon = planMeta.icon;
-                                const features = plan.features?.length ? plan.features : planMeta.fallbackFeatures;
-
-                                return (
-                                    <div
-                                        key={plan.id}
-                                        className="plan-card-new"
-                                        style={{
-                                            position: 'relative',
-                                            paddingTop: '16px', // space for badge
-                                            transform: isPopular ? 'scale(1.03)' : 'scale(1)',
-                                            zIndex: isPopular ? 10 : 1,
-                                        }}
-                                    >
-                                        {/* ===== POPULAR BADGE ===== */}
-                                        {isPopular && !isCurrent && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '2px',
-                                                left: '50%',
-                                                transform: 'translateX(-50%)',
-                                                zIndex: 20,
-                                                background: '#8b5cf6',
-                                                color: '#ffffff',
-                                                padding: '4px 14px',
-                                                borderRadius: '20px',
-                                                fontSize: '11px',
-                                                fontWeight: 600,
-                                                letterSpacing: '0.5px',
-                                                whiteSpace: 'nowrap',
-                                                boxShadow: '0 4px 14px rgba(139, 92, 246, 0.35)',
-                                            }}>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                    <Star size={12} fill="currentColor" /> Most Popular
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {/* ===== CURRENT PLAN BADGE ===== */}
-                                        {isCurrent && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '2px',
-                                                left: '50%',
-                                                transform: 'translateX(-50%)',
-                                                zIndex: 20,
-                                                background: '#8b5cf6',
-                                                color: '#ffffff',
-                                                padding: '3px 12px',
-                                                borderRadius: '20px',
-                                                fontSize: '10px',
-                                                fontWeight: 600,
-                                                whiteSpace: 'nowrap',
-                                                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
-                                            }}>
-                                                ✓ Current Plan
-                                            </div>
-                                        )}
-
-                                        {/* ===== CARD ===== */}
-                                        <div style={{
-                                            borderRadius: '12px',
-                                            overflow: 'hidden',
-                                            background: '#ffffff',
-                                            border: isPopular || isCurrent ? '2px solid #c4b5fd' : '1px solid #e5e7eb',
-                                            boxShadow: isPopular
-                                                ? '0 8px 30px rgba(139, 92, 246, 0.1)'
-                                                : '0 2px 12px rgba(0, 0, 0, 0.04)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            height: '100%',
-                                            transition: 'all 0.3s ease',
-                                        }}>
-                                            <div style={{ padding: '20px 20px 16px', textAlign: 'center' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '2px' }}>
-                                                    <div style={{
-                                                        width: '28px', height: '28px',
-                                                        borderRadius: '8px',
-                                                        background: isPopular ? '#f3f0ff' : '#f9fafb',
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    }}>
-                                                        <PlanIcon size={14} color={isPopular ? '#8b5cf6' : '#6b7280'} />
-                                                    </div>
-                                                    <span style={{ color: '#111827', fontSize: '16px', fontWeight: 600 }}>
-                                                        {plan.name}
-                                                    </span>
-                                                </div>
-
-                                                <p style={{ color: '#9ca3af', fontSize: '12px', margin: '0 0 12px 0' }}>
-                                                    {plan.description || planMeta.tagline}
-                                                </p>
-
-                                                <div style={{ marginBottom: '4px' }}>
-                                                    {plan.originalPrice && (
-                                                        <span style={{ color: '#d1d5db', fontSize: '14px', textDecoration: 'line-through', marginRight: '8px' }}>
-                                                            {plan.originalPrice}
-                                                        </span>
-                                                    )}
-                                                    <span style={{ color: '#111827', fontSize: '24px', fontWeight: 700, lineHeight: 1 }}>
-                                                        {plan.displayPrice}
-                                                    </span>
-                                                </div>
-
-                                                <p style={{ color: '#8b5cf6', fontSize: '11px', margin: '2px 0 0 0', fontWeight: 500 }}>
-                                                    {plan.raw_price === 0
-                                                        ? 'free forever · no credit card required'
-                                                        : (plan.interval === 'ANNUAL' ? 'billed annually' : 'billed monthly')
-                                                            + (plan.trial_days > 0 ? ` · ${plan.trial_days}-day free trial` : '')}
-                                                </p>
-
-                                                <button
-                                                    onClick={() => !isCurrent && handleSelectPlan(plan)}
-                                                    disabled={loadingPlanId !== null || isCurrent}
-                                                    className="plan-cta-btn"
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '10px 20px',
-                                                        borderRadius: '8px',
-                                                        marginTop: '14px',
-                                                        border: isCurrent ? '1px solid #e5e7eb' : isPopular ? 'none' : '1px solid #e5e7eb',
-                                                        background: isCurrent ? '#f9fafb' : isPopular ? '#8b5cf6' : '#ffffff',
-                                                        color: isCurrent ? '#9ca3af' : isPopular ? '#ffffff' : '#374151',
-                                                        fontSize: '13px',
-                                                        fontWeight: 600,
-                                                        cursor: isCurrent ? 'not-allowed' : 'pointer',
-                                                        fontFamily: 'inherit',
-                                                        opacity: loadingPlanId === plan.id ? 0.7 : 1,
-                                                    }}
-                                                >
-                                                    {loadingPlanId === plan.id ? (
-                                                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                                            <span style={{
-                                                                width: '14px', height: '14px',
-                                                                border: '2px solid currentColor',
-                                                                borderTopColor: 'transparent',
-                                                                borderRadius: '50%',
-                                                                display: 'inline-block',
-                                                                animation: 'spin 1s linear infinite',
-                                                            }} />
-                                                            Processing...
-                                                        </span>
-                                                    ) : isCurrent ? '✓ Current Plan'
-                                                        : confirmingFreeId === plan.id ? 'Confirm downgrade to Free'
-                                                        : `Start ${plan.name}`}
-                                                </button>
-                                            </div>
-
-                                            <div style={{ borderTop: '1px solid #f3f4f6', margin: '0 20px' }} />
-
-                                            <div style={{ padding: '14px 20px 20px', flex: 1 }}>
-                                                <p style={{
-                                                    fontSize: '10px', fontWeight: 600, color: '#9ca3af',
-                                                    textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 10px 0',
-                                                }}>
-                                                    What's included
-                                                </p>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <Check size={13} strokeWidth={2.5} style={{ color: isPopular ? '#8b5cf6' : '#c4b5fd', flexShrink: 0 }} />
-                                                        <span style={{ fontSize: '12px', color: '#374151', fontWeight: 600, lineHeight: '16px' }}>
-                                                            {plan.max_locks === 0 ? 'Unlimited content locks'
-                                                                : plan.max_locks === 1 ? '1 content lock'
-                                                                : `Up to ${plan.max_locks} content locks`}
-                                                        </span>
-                                                    </div>
-                                                    {features.map((feature, idx) => (
-                                                        <div key={`f-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <Check size={13} strokeWidth={2.5} style={{ color: isPopular ? '#8b5cf6' : '#c4b5fd', flexShrink: 0 }} />
-                                                            <span style={{ fontSize: '12px', color: '#6b7280', lineHeight: '16px' }}>{feature}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
+                            return (
+                                <div key={plan.id} className={`plan${isCurrent ? ' current' : ''}${isBest ? ' best' : ''}`}>
+                                    {isBest && <span className="plan-badge">{recommended.label}</span>}
+                                    <div className="row g8">
+                                        <span className="plan-ico" aria-hidden="true"><Icon /></span>
+                                        <span className="strong plan-name">{plan.name}</span>
+                                        {isCurrent && <span className="tag now" style={{ marginLeft: 'auto' }}>Current plan</span>}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                                    <p className="xs sub mt4">{plan.description}</p>
 
-                {/* ===== FREE TIER STRIP (kept below the paid grid on purpose) ===== */}
-                {freePlan && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '28px', padding: '0 16px' }}>
-                        <div style={{
-                            width: '100%',
-                            maxWidth: '860px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '16px',
-                            flexWrap: 'wrap',
-                            padding: '14px 20px',
-                            borderRadius: '12px',
-                            background: '#ffffff',
-                            border: '1px solid #e5e7eb',
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                <span style={{
-                                    background: '#dcfce7',
-                                    color: '#15803d',
-                                    padding: '3px 12px',
-                                    borderRadius: '16px',
-                                    fontSize: '12px',
-                                    fontWeight: 700,
-                                }}>
-                                    Free
-                                </span>
-                                <span style={{ fontSize: '13px', color: '#374151' }}>
-                                    {isCurrentPlan(freePlan.id)
-                                        ? 'Currently enjoying the Free plan (1 content lock · passcode & sign-in rules)'
-                                        : confirmingFreeId === freePlan.id
-                                            ? 'Switching to Free cancels your current subscription immediately — click again to confirm.'
-                                            : 'Just getting started? 1 content lock with passcode & sign-in rules — free forever, no credit card required.'}
-                                </span>
-                            </div>
-                            {isCurrentPlan(freePlan.id) ? (
-                                <span style={{
-                                    padding: '8px 18px',
-                                    borderRadius: '8px',
-                                    background: '#f9fafb',
-                                    border: '1px solid #e5e7eb',
-                                    color: '#9ca3af',
-                                    fontSize: '13px',
-                                    fontWeight: 600,
-                                }}>
-                                    ✓ Current Plan
-                                </span>
-                            ) : (
-                                <button
-                                    onClick={() => handleSelectPlan(freePlan)}
-                                    disabled={loadingPlanId !== null}
-                                    className="plan-cta-btn"
-                                    style={{
-                                        padding: '8px 18px',
-                                        borderRadius: '8px',
-                                        border: confirmingFreeId === freePlan.id ? '1px solid #f59e0b' : '1px solid #e5e7eb',
-                                        background: confirmingFreeId === freePlan.id ? '#fffbeb' : '#ffffff',
-                                        color: confirmingFreeId === freePlan.id ? '#b45309' : '#374151',
-                                        fontSize: '13px',
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        fontFamily: 'inherit',
-                                        whiteSpace: 'nowrap',
-                                        opacity: loadingPlanId === freePlan.id ? 0.7 : 1,
-                                    }}
-                                >
-                                    {loadingPlanId === freePlan.id
-                                        ? 'Processing…'
-                                        : confirmingFreeId === freePlan.id
-                                            ? 'Confirm switch to Free'
-                                            : 'Start Free'}
-                                </button>
-                            )}
-                        </div>
+                                    <div className="mt16">
+                                        <span className="plan-price">{plan.priceText}</span>
+                                        <span className="xs sub">/mo</span>
+                                    </div>
+                                    <p className="xs sub plan-bill">{plan.billText}</p>
+
+                                    {renderButton(plan, isCurrent)}
+
+                                    {plan.isFree && !isCurrent && paidToFree && (
+                                        <p className="xs plan-note">
+                                            {confirming
+                                                ? 'Switching to Free cancels your current subscription immediately — click again to confirm.'
+                                                : 'Switching to Free cancels your paid subscription straight away.'}
+                                        </p>
+                                    )}
+
+                                    <div className="stack g8 plan-feats">
+                                        <span className="feat lead"><Tick />{lockLabel(plan.max_locks)}</span>
+                                        {plan.inheritsFrom && (
+                                            <span className="feat"><Tick />Everything in {plan.inheritsFrom}</span>
+                                        )}
+                                        {plan.newFeatures.map((f) => (
+                                            <span key={f} className="feat"><Tick />{f}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
 
-                {/* ===== FOOTER ===== */}
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px', paddingBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#9ca3af', fontSize: '13px' }}>
-                        <Shield size={14} />
-                        <span>Secure payments • {plans.find((p) => p.trial_days > 0) ? 'Free trial on every paid plan • ' : ''}Cancel anytime • Powered by Shopify Billing</span>
+                {/* Three feature lists cannot be read against each other; a table can. */}
+                {cards.length > 1 && (
+                    <>
+                        <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
+                            <button
+                                type="button"
+                                className="btn cmp-btn"
+                                aria-expanded={compareOpen}
+                                aria-controls="plans-cmp"
+                                onClick={() => setCompareOpen((o) => !o)}
+                            >
+                                Compare plans
+                                <Chevron className="cmp-chev" />
+                            </button>
+                        </div>
+
+                        <section className={`band${compareOpen ? '' : ' hide'}`} id="plans-cmp" style={{ marginTop: 14 }}>
+                            <div className="band-h">
+                                <span className="sec-h2">Every plan, side by side</span>
+                                {usage?.planName && (
+                                    <span className="xs sub">Your plan: <strong>{usage.planName}</strong></span>
+                                )}
+                            </div>
+                            <div className="cmp-scroll">
+                                <table className="cmp">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Feature</th>
+                                            {cards.map((c) => (
+                                                <th key={c.id} scope="col" className={isCurrentPlan(c.id) ? 'now' : undefined}>{c.name}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <th scope="row">Locks you can have</th>
+                                            {cards.map((c) => <td key={c.id}>{lockCount(c.max_locks)}</td>)}
+                                        </tr>
+                                        {compareRows.map((label) => (
+                                            <tr key={label}>
+                                                <th scope="row">{label}</th>
+                                                {cards.map((c) => (
+                                                    <td key={c.id}>
+                                                        {(c.features || []).includes(label)
+                                                            ? <Tick className="t-yes" label="Included" />
+                                                            : <span className="t-no" aria-label="Not included">&mdash;</span>}
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                        {maxTrial > 0 && (
+                                            <tr>
+                                                <th scope="row">Free trial</th>
+                                                {cards.map((c) => (
+                                                    <td key={c.id}>
+                                                        {c.trial_days > 0
+                                                            ? `${c.trial_days} days`
+                                                            : <span className="t-no" aria-label="None">&mdash;</span>}
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </>
+                )}
+
+                {/* The questions that decide whether a merchant pays. */}
+                <section className="band" style={{ marginBottom: 10 }}>
+                    <div className="faq-head">
+                        <span className="faq-t">Frequently asked questions</span>
                     </div>
-                </div>
-            </div>
-        </Page>
+                    {faqs.map((f, i) => (
+                        <div className="faq-i" key={f.q}>
+                            <button
+                                type="button"
+                                className="faq-q"
+                                aria-expanded={openFaq === i}
+                                aria-controls={`plans-faq-${i}`}
+                                onClick={() => setOpenFaq((cur) => (cur === i ? null : i))}
+                            >
+                                {f.q}
+                                <span className="faq-chev"><Chevron /></span>
+                            </button>
+                            <div className={`faq-a${openFaq === i ? '' : ' hide'}`} id={`plans-faq-${i}`}>{f.a}</div>
+                        </div>
+                    ))}
+                </section>
+            </main>
+        </div>
     );
 }

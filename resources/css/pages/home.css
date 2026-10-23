@@ -1,0 +1,245 @@
+/* The app's home (Home.jsx). Ported from design-mockup-ink/dashboard.html.
+   Every selector is scoped under .pg-home, because every page's CSS is
+   loaded on every page. */
+
+/* ------------------------------------------------------------ hello -- */
+.pg-home .hi { margin-bottom: 14px; }
+.pg-home .hi-t { font-size: 22px; font-weight: 650; letter-spacing: -.015em;
+                 display: flex; align-items: center; gap: 8px; }
+
+/* ----------------------------------------------------------- figures -- */
+.pg-home .stat-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: 14px;
+    background: #fff; border: 1px solid var(--p-border-soft); border-radius: 12px;
+    box-shadow: var(--p-card-shadow); overflow: hidden;
+}
+.pg-home .stat-row .stat {
+    border: 0; border-radius: 0; box-shadow: none; background: transparent;
+    padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+    color: inherit; text-decoration: none; transition: background .12s; cursor: pointer;
+}
+.pg-home .stat-row .stat + .stat { border-left: 1px solid var(--p-border-soft); }
+.pg-home .stat-row .stat:hover { background: #fafbfc; border-color: transparent; box-shadow: none; }
+.pg-home .stat-row .stat:hover .stat-v { color: var(--accent-strong); }
+.pg-home .stat-ico {
+    width: 32px; height: 32px; border-radius: 9px; background: #f1f1f1;
+    border: 0; display: grid; place-items: center; flex: none; color: var(--ink-1);
+}
+.pg-home .stat-ico svg { width: 17px; height: 17px; }
+.pg-home .stat-ico.good { background: var(--p-success-bg); color: var(--p-success-fg); }
+.pg-home .stat-ico.warn { background: var(--p-warning-bg); color: var(--p-warning-fg); }
+.pg-home .stat-ico.info { background: var(--p-info-bg); color: var(--p-info-fg); }
+.pg-home .stat-ico.brand { background: var(--v-100); color: var(--v-800); }
+.pg-home .stat-v { font-size: 21px; font-weight: 700; line-height: 25px; display: block;
+                   letter-spacing: -.015em; color: var(--p-text); transition: color .12s; }
+.pg-home .stat-l { display: block; font-size: 12.5px; font-weight: 550; color: var(--p-text); }
+.pg-home .stat-note { display: block; font-size: 11.5px; color: var(--p-text-sub); margin-top: 2px; }
+
+/* ------------------------------------------------------- the layout -- */
+.pg-home .home { display: grid; grid-template-columns: minmax(0, 1fr) 316px; gap: 14px; align-items: start; }
+.pg-home .home-main, .pg-home .home-rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.pg-home .sec-head { display: flex; align-items: flex-start; gap: 12px; }
+.pg-home .sec-t { font-size: 14px; font-weight: 650; display: inline-flex; align-items: center; gap: 8px; }
+.pg-home .sec-d { font-size: 12.5px; color: var(--p-text-sub); margin-top: 3px; }
+
+/* ------------------------------------------------------- the chart -- */
+.pg-home .ch-wrap { position: relative; margin-top: 18px; }
+.pg-home .ch-grid { position: absolute; inset: 0 0 auto 0; height: 150px; display: flex;
+                    flex-direction: column; justify-content: space-between; pointer-events: none; }
+.pg-home .ch-g { display: flex; align-items: center; gap: 9px; font-size: 10.5px;
+                 color: var(--p-text-disabled); }
+.pg-home .ch-g > b { width: 27px; text-align: right; font-weight: 500; flex: none; }
+.pg-home .ch-g::after { content: ''; flex: 1; height: 1px; background: var(--p-border-soft); }
+.pg-home .ch-g.base::after { background: var(--p-border); }
+.pg-home .chart { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+                  gap: 10px; align-items: end; height: 150px; margin-left: 36px;
+                  position: relative; }
+.pg-home .ch-col { height: 100%; display: flex; align-items: flex-end; justify-content: center;
+                   position: relative; outline: none; }
+/* No entry animation: the height of a bar is the data. */
+.pg-home .ch-bar {
+    width: 100%; max-width: 26px; background: #eeeef1; border-radius: 4px 4px 0 0;
+    position: relative; transition: background .12s;
+}
+.pg-home .ch-col:hover .ch-bar,
+.pg-home .ch-col:focus-visible .ch-bar { background: #e2e2e7; }
+.pg-home .ch-bar > i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent);
+                       border-radius: 4px 4px 0 0; transition: background .12s; }
+.pg-home .ch-col:hover .ch-bar > i,
+.pg-home .ch-col:focus-visible .ch-bar > i { background: var(--accent-strong); }
+.pg-home .ch-col.peak .ch-bar > i { background: var(--accent-deep); }
+
+.pg-home .ch-days { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+                    gap: 10px; margin: 8px 0 0 36px; }
+.pg-home .ch-days span { font-size: 10.5px; color: var(--p-text-sub); text-align: center;
+                         white-space: nowrap; }
+.pg-home .ch-days span.peak, .pg-home .ch-days span.today { color: var(--p-text); font-weight: 650; }
+
+/* The tooltip sits on top of whichever bar is under the pointer. It lives
+   in the column, so CSS alone shows it. */
+.pg-home .ch-tip {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    background: #1a1a1a; color: #fff; font-size: 11px; line-height: 1.45;
+    padding: 6px 9px; border-radius: 8px; white-space: nowrap; pointer-events: none;
+    opacity: 0; transition: opacity .1s; z-index: 3;
+}
+.pg-home .ch-tip b { font-weight: 650; }
+.pg-home .ch-col.edge-r .ch-tip { left: auto; right: 0; transform: none; }
+.pg-home .ch-col.edge-l .ch-tip { left: 0; transform: none; }
+.pg-home .ch-col:hover .ch-tip,
+.pg-home .ch-col:focus-visible .ch-tip { opacity: 1; }
+
+.pg-home .ch-empty {
+    position: absolute; left: 36px; right: 0; top: 0; height: 150px;
+    display: grid; place-items: center; text-align: center; pointer-events: none;
+}
+.pg-home .ch-empty > span {
+    background: #fff; padding: 8px 14px; border-radius: 9px; font-size: 12.5px;
+    color: var(--p-text-sub); border: 1px solid var(--p-border-soft);
+}
+
+.pg-home .key { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pg-home .key span { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--p-text-sub); }
+.pg-home .key i { width: 9px; height: 9px; border-radius: 3px; display: block; }
+
+/* The answer to "are my locks working". */
+.pg-home .run {
+    display: flex; align-items: center; gap: 11px; margin-top: 12px;
+    padding: 10px 12px; border-radius: 10px;
+    background: var(--p-success-bg); border: 1px solid rgba(0, 0, 0, .06);
+}
+.pg-home .run-ic { width: 9px; height: 9px; border-radius: 50%; flex: none;
+                   background: var(--p-success-fg); }
+.pg-home .run-t { display: block; font-size: 13px; font-weight: 650; }
+.pg-home .run-d { display: block; font-size: 12px; color: var(--p-text-sub); margin-top: 1px; }
+.pg-home .run.off { background: var(--p-critical-bg); }
+.pg-home .run.off .run-ic { background: var(--p-critical-fg); }
+.pg-home .run.off .run-t { color: var(--p-critical-fg); }
+.pg-home .run.unknown { background: #f6f6f7; }
+.pg-home .run.unknown .run-ic { background: var(--p-text-disabled); }
+
+/* --------------------------------------------------- the extensions -- */
+.pg-home .ext { display: flex; align-items: center; gap: 13px; padding: 13px 16px;
+                border-bottom: 1px solid var(--p-border-soft); transition: background .12s; }
+.pg-home .ext:last-child { border-bottom: 0; }
+.pg-home .ext:hover { background: #fafafa; }
+.pg-home .ext.off { box-shadow: inset 3px 0 0 var(--p-warning-fg); }
+.pg-home .ext-ico {
+    width: 34px; height: 34px; border-radius: 9px; flex: none; display: grid;
+    place-items: center; background: #f1f1f1; color: var(--ink-1);
+}
+.pg-home .ext-n { font-size: 13px; font-weight: 600; display: flex; align-items: center;
+                  gap: 7px; flex-wrap: wrap; }
+.pg-home .ext-d { font-size: 12.5px; color: var(--p-text-sub); margin-top: 2px; }
+.pg-home .ext-h { font-size: 12px; color: var(--p-text-sub); margin-top: 3px; display: none; }
+.pg-home .ext.checking .badge, .pg-home .ext.checking .btn { visibility: hidden; }
+.pg-home .ext.checking .ext-h { display: block; }
+.pg-home .ext-spin {
+    width: 15px; height: 15px; border-radius: 50%; flex: none;
+    border: 2px solid var(--p-border); border-top-color: var(--accent);
+    animation: pg-home-spin .7s linear infinite; display: none;
+}
+.pg-home .ext.checking .ext-spin { display: block; }
+@keyframes pg-home-spin { to { transform: rotate(360deg); } }
+
+/* ------------------------------------------------- done-for-you set -- */
+.pg-home .dfy {
+    display: flex; align-items: center; gap: 20px; padding: 15px 18px; margin-bottom: 14px;
+    border-radius: 12px; border: 1px solid var(--p-border-soft); background: #fff;
+    box-shadow: var(--p-card-shadow);
+}
+.pg-home .dfy-t { font-size: 14px; font-weight: 650; }
+.pg-home .dfy-d { font-size: 12.5px; color: var(--p-text-sub); margin: 3px 0 0; max-width: 92ch; }
+.pg-home .dfy-go { flex: none; position: relative; z-index: 1; }
+.pg-home .dfy-art { width: 96px; height: 73px; flex: none; order: -1; color: var(--accent); }
+.pg-home .gearA { transform-origin: 34px 40px; animation: pg-home-turn 7s linear infinite; }
+.pg-home .gearB { transform-origin: 112px 72px; animation: pg-home-turn 7s linear infinite reverse; }
+@keyframes pg-home-turn { to { transform: rotate(360deg); } }
+.pg-home .dfy-lock { transform-origin: 73px 58px; animation: pg-home-settle 3.4s ease-in-out infinite; }
+@keyframes pg-home-settle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+.pg-home .spark { animation: pg-home-spark 3.4s ease-in-out infinite; }
+.pg-home .spark:nth-of-type(2) { animation-delay: .5s; }
+@keyframes pg-home-spark {
+    0%, 55%, 100% { opacity: 0; transform: scale(.5); }
+    70% { opacity: 1; transform: scale(1); }
+}
+
+/* ------------------------------------------------------------ rail -- */
+.pg-home .plan-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 7px; background: var(--accent); color: #fff;
+    max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pg-home .bar { height: 6px; border-radius: 20px; background: #e3e3e3; overflow: hidden; }
+.pg-home .bar > i { display: block; height: 100%; border-radius: 20px; background: var(--accent);
+                    transition: width .5s ease; }
+.pg-home .bar.full > i { background: var(--p-critical-fg); }
+
+/* ------------------------------------------------- the other apps -- */
+.pg-home .promo-track {
+    display: flex; gap: 12px; margin-top: 13px; padding: 2px 2px 4px;
+    overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth;
+    scrollbar-width: none;
+}
+.pg-home .promo-track::-webkit-scrollbar { display: none; }
+.pg-home .promo-track:focus-visible { outline: 2px solid var(--accent-ring); border-radius: 12px; }
+.pg-home .promo-c {
+    flex: 0 0 clamp(210px, calc((100% - 24px) / 3), 340px); scroll-snap-align: start;
+    display: flex; flex-direction: column; gap: 10px; padding: 14px;
+    border: 1px solid var(--p-border-soft); border-radius: 11px; background: #fff;
+    transition: border-color .12s, box-shadow .12s;
+}
+.pg-home .promo-c:hover { border-color: #b5b5b5; box-shadow: var(--p-card-shadow); }
+.pg-home .promo-h { display: flex; align-items: center; gap: 10px; }
+.pg-home .promo-n { font-size: 12.5px; font-weight: 650; line-height: 1.3; }
+.pg-home .promo-t { font-size: 11.5px; color: var(--p-text-sub); line-height: 1.45; margin: 0; flex: 1; }
+.pg-home .promo-c .btn { align-self: flex-start; text-decoration: none; }
+.pg-home .app-ic {
+    width: 34px; height: 34px; border-radius: 9px; flex: none; overflow: hidden;
+    background: var(--v-900); color: #fff; display: grid; place-items: center;
+    font-size: 14px; font-weight: 700;
+}
+.pg-home .app-ic::before { content: attr(data-m); grid-area: 1 / 1; }
+.pg-home .app-ic img { grid-area: 1 / 1; width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.pg-home .help-l { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+.pg-home .help-l a, .pg-home .help-l button {
+    display: flex; align-items: center; gap: 9px; padding: 7px 8px; margin: 0 -8px;
+    border-radius: 8px; font-size: 13px; color: var(--p-text); text-decoration: none;
+    background: transparent; border: 0; font: inherit; text-align: left; cursor: pointer;
+}
+.pg-home .help-l a:hover, .pg-home .help-l button:hover { background: #f1f1f1; }
+.pg-home .help-l svg { color: var(--p-text-sub); flex: none; }
+
+/* --------------------------------------------------------- narrower -- */
+@media (max-width: 1240px) { .pg-home .stat-note { display: none; } }
+@media (max-width: 1040px) {
+    .pg-home .home { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1000px) {
+    .pg-home .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .pg-home .stat-row .stat:nth-child(3) { border-left: 0; }
+    .pg-home .stat-row .stat:nth-child(n+3) { border-top: 1px solid var(--p-border-soft); }
+}
+@media (max-width: 720px) {
+    .pg-home .stat-row .stat { padding: 12px 13px; gap: 11px; }
+    .pg-home .sec-head { flex-wrap: wrap; }
+    .pg-home .sec-head > .btn { order: 3; width: 100%; }
+    .pg-home .ext { flex-wrap: wrap; row-gap: 10px; }
+    .pg-home .ext .grow { flex: 1 0 calc(100% - 47px); }
+    .pg-home .ext .btn { margin-left: auto; }
+    .pg-home .dfy { flex-wrap: wrap; gap: 12px; }
+    .pg-home .dfy .grow { flex-basis: 100%; order: 1; }
+    .pg-home .dfy-go { width: 100%; order: 2; }
+    .pg-home .chart, .pg-home .ch-days { gap: 4px; }
+    .pg-home .ch-days span { font-size: 9.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pg-home .gearA, .pg-home .gearB, .pg-home .dfy-lock, .pg-home .spark,
+    .pg-home .ext-spin { animation: none !important; }
+}

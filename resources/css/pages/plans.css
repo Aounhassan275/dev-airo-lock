@@ -1,0 +1,172 @@
+/* Subscriptions (/pricing) — ported from design-mockup-ink/plans.html.
+   Every selector is scoped under .pg-plans: all pages' CSS loads globally. */
+
+.pg-plans .plans-title { font-size: 24px; font-weight: 650; }
+.pg-plans .plans-lede { font-size: 12.5px; }
+
+/* What you are on, in the same light card the lock list uses. */
+.pg-plans .usage {
+    display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+    padding: 13px 18px; margin: 0 auto 16px; max-width: 920px;
+    border: 1px solid var(--p-border); border-radius: 14px; background: #fff;
+    box-shadow: var(--p-card-shadow);
+}
+.pg-plans .usage-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 7px; background: var(--accent); color: #fff; flex: none;
+}
+.pg-plans .usage-name { display: block; font-size: 13px; font-weight: 650; }
+.pg-plans .usage-sub { display: block; font-size: 12px; color: var(--p-text-sub); margin-top: 1px; }
+.pg-plans .usage-meter { flex: 1; min-width: 220px; }
+.pg-plans .usage-bar { height: 6px; border-radius: 20px; background: #e3e3e3; overflow: hidden; }
+.pg-plans .usage-bar > i { display: block; height: 100%; border-radius: 20px; background: var(--accent); }
+.pg-plans .usage-bar.full > i { background: var(--p-critical-fg, #8e1f0b); }
+
+/* Notices: the trial (info), test billing (attention) and errors (critical). */
+.pg-plans .trial {
+    display: flex; align-items: flex-start; gap: 11px; max-width: 920px;
+    margin: 0 auto 16px; padding: 12px 14px; border-radius: 12px;
+    background: #f3fafe; border: 1px solid #cfe9f7; color: var(--p-info-fg);
+}
+.pg-plans .trial.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.pg-plans .trial.err { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.pg-plans .trial > svg { width: 17px; height: 17px; flex: none; margin-top: 1px; }
+.pg-plans .trial-t { font-size: 13px; font-weight: 650; }
+.pg-plans .trial-d { display: block; font-size: 12.5px; margin-top: 2px; opacity: .88; }
+.pg-plans .trial .btn {
+    margin-left: auto; flex: none; background: transparent; border-color: transparent;
+    box-shadow: none; color: inherit; padding: 2px 6px;
+}
+.pg-plans .trial .btn:hover { background: rgba(0, 0, 0, .05); }
+
+/* Billing period toggle; the saving sits on the control that produces it. */
+.pg-plans .cycle { display: inline-flex; padding: 3px; border-radius: 50px; background: #f1f1f1;
+    border: 1px solid var(--p-border-soft); }
+.pg-plans .cycle button { display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 15px; border-radius: 50px; border: 0; background: transparent;
+    font: inherit; font-size: 12px; font-weight: 600; color: var(--p-text-sub); cursor: pointer; }
+.pg-plans .cycle button.on { background: var(--ink-1); color: #fff; }
+.pg-plans .cycle .off-pill {
+    font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 50px;
+    background: var(--p-success-bg); color: var(--p-success-fg);
+}
+.pg-plans .cycle button.on .off-pill { background: rgba(255, 255, 255, .16); color: #fff; }
+
+/* The cards line up along the bottom as well as the top. */
+.pg-plans .plan-grid { display: grid; grid-template-columns: repeat(var(--plan-cols, 3), 1fr); gap: 14px;
+    max-width: 920px; margin: 0 auto; align-items: stretch; }
+.pg-plans .plan-grid.cols-4 { max-width: 1120px; }
+.pg-plans .plan {
+    position: relative; background: #fff; border-radius: 16px;
+    border: 1px solid var(--p-border-soft); box-shadow: 0 1px 2px rgba(26, 26, 26, .05);
+    padding: 22px 20px 20px; display: flex; flex-direction: column;
+}
+.pg-plans .plan .feat { line-height: 1.5; }
+.pg-plans .plan.best {
+    border-color: #9ee0bc;
+    background: linear-gradient(158deg, #dff7ea 0%, #ecfbf3 42%, #f7fdfa 100%);
+    box-shadow: 0 10px 30px -20px rgba(12, 81, 50, .45);
+}
+.pg-plans .plan.best .plan-ico { background: var(--p-success-bg); color: var(--p-success-fg); }
+.pg-plans .plan.best .plan-badge { background: var(--p-success-bg); color: var(--p-success-fg); }
+.pg-plans .plan.current { border: 1.5px solid var(--accent); }
+.pg-plans .plan-badge {
+    position: absolute; top: -9px; left: 50%; transform: translateX(-50%); z-index: 20;
+    background: var(--p-attention-bg); color: var(--p-attention-fg);
+    padding: 4px 13px; border-radius: 20px; white-space: nowrap;
+    font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+}
+.pg-plans .plan-ico { width: 42px; height: 42px; border-radius: 12px; background: #f1f1f1; color: #6b7280;
+    display: grid; place-items: center; flex: none; }
+.pg-plans .plan-ico svg { width: 20px; height: 20px; }
+.pg-plans .plan.current .plan-ico { background: var(--accent); color: #fff; }
+.pg-plans .plan-name { font-size: 15px; }
+.pg-plans .plan-price { color: #111827; font-size: 24px; font-weight: 700; line-height: 1; }
+.pg-plans .plan-was { font-size: 14px; text-decoration: line-through; margin-right: 8px; }
+.pg-plans .plan-bill { margin-top: 2px; font-weight: 500; }
+.pg-plans .plan-feats { margin-top: 16px; }
+.pg-plans .plan-note { margin-top: 8px; color: #b45309; }
+
+/* The plan you are on: a control that reports rather than offers. */
+.pg-plans .btn.have {
+    background: #f6f6f7; border-color: var(--p-border); color: var(--p-text-sub);
+    box-shadow: none; cursor: default; font-weight: 550;
+}
+.pg-plans .btn.have:hover { background: #f6f6f7; }
+.pg-plans .btn.warn { background: #fffbeb; border-color: #f59e0b; color: #b45309; }
+.pg-plans .btn[disabled]:not(.have) { opacity: .7; cursor: progress; }
+.pg-plans .btn-spin {
+    width: 13px; height: 13px; border: 2px solid currentColor; border-top-color: transparent;
+    border-radius: 50%; display: inline-block; animation: pg-plans-spin 1s linear infinite;
+}
+@keyframes pg-plans-spin { to { transform: rotate(360deg); } }
+
+.pg-plans .feat { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #374151; }
+.pg-plans .feat svg { flex: none; margin-top: 2px; }
+.pg-plans .feat.lead { font-weight: 600; }
+
+/* Bands under the plans: cards with their own title row. */
+.pg-plans .band {
+    max-width: 920px; margin: 20px auto 0; background: #fff;
+    border: 1px solid var(--p-border-soft); border-radius: 14px;
+    box-shadow: var(--p-card-shadow); overflow: hidden;
+}
+.pg-plans .band-h {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 13px 18px; border-bottom: 1px solid var(--p-border-soft);
+}
+.pg-plans .sec-h2 { font-size: 14px; font-weight: 650; }
+.pg-plans .band-l { font-size: 12.5px; font-weight: 550; color: var(--p-text-sub); text-decoration: none; }
+.pg-plans .band-l:hover { color: var(--p-text); text-decoration: underline; }
+@media (max-width: 620px) {
+    .pg-plans .band-h { flex-wrap: wrap; row-gap: 4px; }
+    .pg-plans .band-h .band-l { flex: 1 0 100%; }
+}
+
+/* Comparison table. */
+.pg-plans .cmp-scroll { overflow-x: auto; }
+.pg-plans .cmp { width: 100%; border-collapse: collapse; min-width: 560px; }
+.pg-plans .cmp th, .pg-plans .cmp td { padding: 10px 14px; text-align: left; font-size: 12.5px;
+    border-bottom: 1px solid var(--p-border-soft); }
+.pg-plans .cmp thead th { font-size: 12px; font-weight: 650; background: #fafafa;
+    border-bottom: 1px solid var(--p-border); }
+.pg-plans .cmp thead th.now { color: var(--accent); }
+.pg-plans .cmp tbody th { font-weight: 450; color: var(--p-text); }
+.pg-plans .cmp td { text-align: center; color: var(--p-text-sub); }
+.pg-plans .cmp tbody tr:last-child th, .pg-plans .cmp tbody tr:last-child td { border-bottom: 0; }
+.pg-plans .cmp tbody tr:hover { background: #fafafa; }
+.pg-plans .t-yes { width: 14px; height: 14px; color: var(--p-success-fg); }
+.pg-plans .t-no { color: var(--p-text-disabled); }
+.pg-plans .cmp-chev { transition: transform .15s; }
+.pg-plans .cmp-btn[aria-expanded="true"] .cmp-chev { transform: rotate(180deg); }
+
+/* The questions people ask before they pay, opened one at a time. */
+.pg-plans .faq-head { padding: 17px 20px 15px; }
+.pg-plans .faq-t { font-size: 17px; font-weight: 700; letter-spacing: -.015em; }
+.pg-plans .faq-i { border-top: 1px solid var(--p-border-soft); }
+.pg-plans .faq-q {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 14px 20px; background: none; border: 0; font: inherit;
+    text-align: left; cursor: pointer; font-size: 13px; font-weight: 600;
+    color: var(--p-text);
+}
+.pg-plans .faq-q:hover { background: #fafafa; }
+.pg-plans .faq-chev { flex: none; color: var(--p-text-sub); transition: transform .18s;
+    display: grid; place-items: center; }
+.pg-plans .faq-chev svg { width: 15px; height: 15px; display: block; }
+.pg-plans .faq-q[aria-expanded="true"] .faq-chev { transform: rotate(180deg); }
+.pg-plans .faq-a { padding: 0 20px 15px; font-size: 12.5px; color: var(--p-text-sub);
+    line-height: 1.6; max-width: 780px; }
+
+.pg-plans .plans-foot { display: flex; justify-content: center; align-items: center; gap: 6px;
+    margin-top: 24px; color: var(--p-text-sub); font-size: 12.5px; text-align: center; }
+
+@media (max-width: 1100px) {
+    .pg-plans .plan-grid.cols-4 { grid-template-columns: repeat(2, 1fr); max-width: 920px; }
+}
+@media (max-width: 900px) {
+    .pg-plans .plan-grid,
+    .pg-plans .plan-grid.cols-4 { grid-template-columns: 1fr; }
+    .pg-plans .usage { gap: 12px 16px; }
+    .pg-plans .usage-meter { min-width: 100%; order: 3; }
+}

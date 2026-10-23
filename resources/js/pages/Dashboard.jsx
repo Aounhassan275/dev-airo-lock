@@ -1,38 +1,10 @@
 import { router, usePage } from '@inertiajs/react';
 import { useAppBridge } from '@shopify/app-bridge-react';
-import {
-    Badge,
-    BlockStack,
-    Box,
-    Button,
-    Card,
-    ChoiceList,
-    EmptyState,
-    IndexFilters,
-    IndexTable,
-    InlineStack,
-    Modal,
-    Page,
-    Pagination,
-    Text,
-    Tooltip,
-    useIndexResourceState,
-    useSetIndexFiltersMode,
-} from '@shopify/polaris';
-import { DeleteIcon, EditIcon, PlusIcon, ViewIcon, DuplicateIcon } from '@shopify/polaris-icons';
-import { Lock, CheckCircle, EyeOff, ShieldCheck, Sparkles, ArrowUpRight, Crown } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-    SORT_COLUMN_BY_FIELD,
-    SORT_FIELD_BY_COLUMN,
-    filterAndSortLocks,
-} from '../lib/lockList';
-import {
-    NEUTRAL_COLOR,
-    lockKindLabel,
-    resourceTypeLabel,
-    resourceTypePillStyle,
-} from '../lib/resourceTypes';
+import { Modal, Text } from '@shopify/polaris';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { filterAndSortLocks } from '../lib/lockList';
+import { lockKindLabel, resourceTypeLabel } from '../lib/resourceTypes';
+import '../../css/pages/locks.css';
 
 // ---------------------------------------------------------------------------
 // Tiny Shopify toast helper (works with App Bridge 3+)
@@ -55,69 +27,47 @@ function useShopifyToast() {
 }
 
 // ---------------------------------------------------------------------------
-// Knob Toggle
+// Icons (stroked, from the mockup)
 // ---------------------------------------------------------------------------
-function KnobToggle({ checked, onChange, disabled = false }) {
-    return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={checked}
-            disabled={disabled}
-            onClick={() => !disabled && onChange(!checked)}
-            style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                opacity: disabled ? 0.5 : 1,
-            }}
-        >
-            <span
-                style={{
-                    position: 'relative',
-                    width: '40px',
-                    height: '22px',
-                    borderRadius: '11px',
-                    background: checked ? '#22c55e' : '#d1d5db',
-                    transition: 'background 0.2s ease',
-                    flexShrink: 0,
-                    boxShadow: checked ? '0 0 0 2px rgba(34,197,94,0.2)' : 'none',
-                }}
-            >
-                <span
-                    style={{
-                        position: 'absolute',
-                        top: '3px',
-                        left: checked ? '21px' : '3px',
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '50%',
-                        background: '#ffffff',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
-                        transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    }}
-                />
-            </span>
-            <span
-                style={{
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: checked ? '#16a34a' : '#6b7280',
-                    minWidth: '52px',
-                }}
-            >
-                {checked ? 'Active' : 'Inactive'}
-            </span>
-        </button>
-    );
-}
+const svgProps = {
+    width: 19, height: 19, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+    strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+};
+const IcoActive = () => (<svg {...svgProps}><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.5 2.5 4.5-5" /></svg>);
+const IcoInactive = () => (<svg {...svgProps}><path d="M3 3l18 18M10.6 10.7a2 2 0 002.8 2.8" /><path d="M16.7 16.7A9.5 9.5 0 0112 18c-5 0-9-6-9-6a16 16 0 014.1-4.8" /></svg>);
+const IcoUnlocked = () => (<svg {...svgProps}><rect x="4" y="10.5" width="16" height="10" rx="2.5" /><path d="M8 10.5V7.5a4 4 0 017.5-2" /></svg>);
+const IcoShield = () => (<svg {...svgProps}><path d="M12 3l8 3v6c0 5-3.4 8.3-8 9-4.6-.7-8-4-8-9V6z" /><path d="M9 12l2 2 4-4" /></svg>);
+const smallSvg = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, 'aria-hidden': true };
+const IcoEdit = () => (<svg {...smallSvg}><path d="M14 6l4 4L8 20H4v-4z" /></svg>);
+const IcoDelete = () => (<svg {...smallSvg}><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" /></svg>);
+const IcoSearch = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>);
 
 // ---------------------------------------------------------------------------
-// Main Dashboard
+// Formatting
+// ---------------------------------------------------------------------------
+const fmtDate = (ms) =>
+    new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+
+function relativeDay(ms) {
+    if (Number.isNaN(ms)) return '—';
+    const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const today = startOf(new Date());
+    const day = startOf(new Date(ms));
+    if (day === today) return 'Today';
+    if (day === today - 86400000) return 'Yesterday';
+    return fmtDate(ms);
+}
+
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+const TABS = [
+    { id: 'all', label: 'All' },
+    { id: 'Active', label: 'Active' },
+    { id: 'Inactive', label: 'Inactive' },
+];
+
+// ---------------------------------------------------------------------------
+// Main
 // ---------------------------------------------------------------------------
 export default function Dashboard() {
     const app = useAppBridge();
@@ -135,9 +85,8 @@ export default function Dashboard() {
 
     const currentPlan = plan;
 
-    // NOTE: the storefront "app embed disabled" warning is now rendered app-wide
-    // by <GlobalExtensionNotice> (app.jsx), so it shows on every page and the
-    // status check is async — no per-page wiring here anymore.
+    // NOTE: the storefront "app embed disabled" warning is rendered app-wide
+    // by <GlobalExtensionNotice> (app.jsx), so it shows on every page.
 
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [deleteType, setDeleteType] = useState(null);
@@ -157,63 +106,76 @@ export default function Dashboard() {
         router.visit('/lock/create');
     };
 
+    // Per-lock 30-day activity arrives from DashboardController@locks as
+    // activity_30d; when it's absent the Activity column and stat are omitted
+    // rather than shown as zeros.
+    const hasActivity = (fetchedLocks || []).some((l) => l && l.activity_30d);
+
     const locks = useMemo(() => {
         const now = Date.now();
         const computeScheduleState = (startsAt, expiresAt) => {
             const startsMs = startsAt ? Date.parse(startsAt) : NaN;
             const expiresMs = expiresAt ? Date.parse(expiresAt) : NaN;
             if (!Number.isNaN(expiresMs) && now >= expiresMs) {
-                return { kind: 'expired', date: new Date(expiresMs).toLocaleDateString() };
+                return { kind: 'expired', date: fmtDate(expiresMs) };
             }
             if (!Number.isNaN(startsMs) && now < startsMs) {
-                return { kind: 'scheduled', date: new Date(startsMs).toLocaleString() };
+                return { kind: 'scheduled', date: fmtDate(startsMs), full: new Date(startsMs).toLocaleString() };
             }
             return null;
         };
-        return (fetchedLocks || []).map((lock) => ({
-            id: lock.id.toString(),
-            name: lock.name,
-            description: lock.description || '',
-            status: lock.status === true || lock.status === '1' || lock.status === 1 || lock.status === 'Active' ? 'Active' : 'Inactive',
-            createdAt: new Date(lock.created_at).toLocaleDateString(),
-            // A lock with no rules protects nothing — say 0 rather than the
-            // flattering 1 this used to report (which also inflated the
-            // "Items Secured" stat).
-            itemCount: lock.access_rules_count ?? 0,
-            type: lock.type,
-            resourceTypes: Array.isArray(lock.resource_types) ? lock.resource_types : [],
-            lastUpdated: new Date(lock.updated_at).toLocaleDateString(),
-            scheduleState: computeScheduleState(lock.starts_at, lock.expires_at),
-            original: lock,
-        }));
+        return (fetchedLocks || []).map((lock) => {
+            const updatedMs = Date.parse(lock.updated_at);
+            const createdMs = Date.parse(lock.created_at);
+            return {
+                id: lock.id.toString(),
+                name: lock.name,
+                description: lock.description || '',
+                status: lock.status === true || lock.status === '1' || lock.status === 1 || lock.status === 'Active' ? 'Active' : 'Inactive',
+                createdAt: Number.isNaN(createdMs) ? '—' : fmtDate(createdMs),
+                // A lock with no rules protects nothing — say 0 rather than 1.
+                itemCount: lock.access_rules_count ?? 0,
+                type: lock.type,
+                resourceTypes: Array.isArray(lock.resource_types) ? lock.resource_types : [],
+                updatedMs: Number.isNaN(updatedMs) ? 0 : updatedMs,
+                lastUpdated: relativeDay(updatedMs),
+                scheduleState: computeScheduleState(lock.starts_at, lock.expires_at),
+                seen: Number(lock.activity_30d?.seen ?? 0),
+                unlocked: Number(lock.activity_30d?.unlocked ?? 0),
+                original: lock,
+            };
+        });
     }, [fetchedLocks]);
 
     const [queryValue, setQueryValue] = useState('');
-    const [statusFilter, setStatusFilter] = useState([]);
+    const [tab, setTab] = useState('all');
+    const [sortKey, setSortKey] = useState('updated');
     const [currentPage, setCurrentPage] = useState(1);
     const [planBannerDismissed, setPlanBannerDismissed] = useState(false);
-    const [sortState, setSortState] = useState({ field: 'name', direction: 'ascending' });
-    const [sortSelected, setSortSelected] = useState(['name asc']);
+    const [selectedIds, setSelectedIds] = useState([]);
     const itemsPerPage = 10;
 
-    const { mode, setMode } = useSetIndexFiltersMode();
+    const statusFilter = useMemo(() => (tab === 'all' ? [] : [tab]), [tab]);
 
-    const filteredLocks = useMemo(
-        () => filterAndSortLocks(locks, { query: queryValue, statuses: statusFilter, sort: sortState }),
-        [locks, queryValue, statusFilter, sortState],
-    );
-
-    // Selection tracks what's actually on screen. Handing the hook every lock
-    // made "select all" reach past the search — a merchant filtering to one
-    // lock and hitting the header checkbox selected (and could bulk-delete)
-    // locks they couldn't even see.
-    const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
-        useIndexResourceState(filteredLocks);
+    const filteredLocks = useMemo(() => {
+        const base = filterAndSortLocks(locks, {
+            query: queryValue,
+            statuses: statusFilter,
+            sort: { field: 'name', direction: 'ascending' },
+        });
+        if (sortKey === 'name') return base;
+        const key = {
+            updated: (l) => l.updatedMs,
+            activity: (l) => l.unlocked,
+            items: (l) => l.itemCount,
+        }[sortKey];
+        // Stable on top of the name order, so ties stay alphabetical.
+        return [...base].sort((a, b) => key(b) - key(a));
+    }, [locks, queryValue, statusFilter, sortKey]);
 
     const totalPages = Math.max(1, Math.ceil(filteredLocks.length / itemsPerPage));
-    // Deleting the last row of a page, or narrowing the list with a filter, can
-    // strand currentPage past the end — that showed an empty table with no
-    // pagination to click back with. Clamp instead.
+    // Deleting the last row of a page, or narrowing the list, can strand
+    // currentPage past the end. Clamp instead.
     const activePage = Math.min(currentPage, totalPages);
     const startIndex = (activePage - 1) * itemsPerPage;
     const paginatedLocks = filteredLocks.slice(startIndex, startIndex + itemsPerPage);
@@ -222,20 +184,43 @@ export default function Dashboard() {
         if (currentPage !== activePage) setCurrentPage(activePage);
     }, [currentPage, activePage]);
 
-    // A new search or status filter reshuffles the list: go back to page one and
-    // drop selections, which would otherwise still point at now-hidden locks.
-    const filterKey = `${queryValue.trim()}|${[...statusFilter].sort().join(',')}`;
+    // Selection only ever points at locks that still exist and are on screen
+    // — "select all" reaching past the search could bulk-delete locks the
+    // merchant couldn't see.
+    const visibleIds = useMemo(() => paginatedLocks.map((l) => l.id), [paginatedLocks]);
+    const selectedResources = useMemo(
+        () => selectedIds.filter((id) => visibleIds.includes(id)),
+        [selectedIds, visibleIds],
+    );
+    const clearSelection = useCallback(() => setSelectedIds([]), []);
+
+    // A new search, tab or sort reshuffles the list: back to page one and drop
+    // selections, which would otherwise point at now-hidden locks.
+    const filterKey = `${queryValue.trim()}|${tab}|${sortKey}`;
+    const firstFilterRun = useRef(true);
     useEffect(() => {
+        if (firstFilterRun.current) { firstFilterRun.current = false; return; }
         setCurrentPage(1);
         clearSelection();
-        // clearSelection is not referentially stable across renders; keying off
-        // the filter alone is what we want here.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filterKey]);
+    }, [filterKey, clearSelection]);
 
+    const toggleOne = (id) =>
+        setSelectedIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+    const allOnPage = visibleIds.length > 0 && selectedResources.length === visibleIds.length;
+    const someOnPage = selectedResources.length > 0 && !allOnPage;
+    const toggleAll = () => setSelectedIds(allOnPage ? [] : [...visibleIds]);
+
+    const selectAllRef = useRef(null);
+    useEffect(() => {
+        if (selectAllRef.current) selectAllRef.current.indeterminate = someOnPage;
+    }, [someOnPage]);
+
+    // Every figure above the table is the table counted.
     const activeCount = locks.filter((l) => l.status === 'Active').length;
-    const inactiveCount = locks.filter((l) => l.status === 'Inactive').length;
+    const inactiveCount = locks.length - activeCount;
     const totalItems = locks.reduce((sum, l) => sum + l.itemCount, 0);
+    const totalUnlocked = locks.reduce((sum, l) => sum + l.unlocked, 0);
+    const totalSeen = locks.reduce((sum, l) => sum + l.seen, 0);
 
     const getBannerMessage = () => {
         if (!currentPlan) return '';
@@ -312,9 +297,7 @@ export default function Dashboard() {
                 // Inside the embedded-app iframe a REFUSAL can come back as a 200
                 // redirect with the flash error stripped (partitioned cookies), so
                 // onSuccess fires even when nothing changed. Trust the reloaded
-                // props, not the callback: only claim success if the lock's real
-                // status actually flipped. (Backend also carries the reason in a
-                // ?save_error= param — see DashboardController::refuseBack.)
+                // props: only claim success if the lock's real status flipped.
                 const fresh = (page?.props?.locks || []).find((l) => String(l.id) === String(lock.id));
                 if (fresh && isLockActive(fresh) === wantActive) {
                     showToast(`"${lock.name}" set to ${newStatus}.`);
@@ -322,7 +305,6 @@ export default function Dashboard() {
                     const reason = consumeSaveError();
                     showToast(reason || `Couldn't set "${lock.name}" to ${newStatus}. Please try again.`, { isError: true });
                 } else {
-                    // Lock missing from fresh props (shouldn't happen) — optimistic fallback.
                     showToast(`"${lock.name}" set to ${newStatus}.`);
                 }
                 clearToggling();
@@ -342,7 +324,7 @@ export default function Dashboard() {
             return l && isLockActive(l) === wantActive;
         }).length;
 
-    const handleBulkActivate = useCallback(() => {
+    const handleBulkActivate = () => {
         const selected = locks.filter((l) => selectedResources.includes(l.id));
         if (selected.every((l) => l.status === 'Active')) { showToast('All selected locks are already active.'); return; }
         const targetIds = [...selectedResources];
@@ -360,9 +342,9 @@ export default function Dashboard() {
             },
             onError: () => showToast('Some locks failed to activate.', { isError: true }),
         });
-    }, [selectedResources, locks, clearSelection, showToast]);
+    };
 
-    const handleBulkDeactivate = useCallback(() => {
+    const handleBulkDeactivate = () => {
         const selected = locks.filter((l) => selectedResources.includes(l.id));
         if (selected.every((l) => l.status === 'Inactive')) { showToast('All selected locks are already inactive.'); return; }
         const targetIds = [...selectedResources];
@@ -380,385 +362,395 @@ export default function Dashboard() {
             },
             onError: () => showToast('Some locks failed to deactivate.', { isError: true }),
         });
-    }, [selectedResources, locks, clearSelection, showToast]);
+    };
 
-    const promotedBulkActions = [
-        { content: 'Activate', onAction: handleBulkActivate },
-        { content: 'Deactivate', onAction: handleBulkDeactivate },
-    ];
-    const bulkActions = [{ content: 'Delete selected', destructive: true, onAction: openBulkDeleteModal }];
+    const clearFilters = () => { setQueryValue(''); setTab('all'); };
 
-    const sortOptions = [
-        { label: 'Lock name', value: 'name asc', directionLabel: 'A–Z' },
-        { label: 'Lock name', value: 'name desc', directionLabel: 'Z–A' },
-        { label: 'Items', value: 'items asc', directionLabel: 'Low to high' },
-        { label: 'Items', value: 'items desc', directionLabel: 'High to low' },
-        { label: 'Status', value: 'status asc', directionLabel: 'A–Z' },
-        { label: 'Status', value: 'status desc', directionLabel: 'Z–A' },
-    ];
+    // ---------------------------------------------------------------- plan --
+    const showPlan = currentPlan && !planBannerDismissed;
+    const limited = currentPlan && !currentPlan.hasUnlimitedLocks && currentPlan.maxLocks > 0;
+    const usedPct = limited ? Math.min(100, Math.round((currentPlan.currentLocks / currentPlan.maxLocks) * 100)) : 0;
+    const paidAndActive = currentPlan?.hasPaidPlan && !currentPlan?.isTrial && !currentPlan?.limitReached;
+    const planTitle = !currentPlan ? '' : currentPlan.limitReached
+        ? 'Lock limit reached'
+        : currentPlan.isTrial
+            ? `${currentPlan.name} plan · free trial`
+            : paidAndActive ? `${currentPlan.name} plan active` : currentPlan.name;
 
-    const handleSortChange = useCallback((value) => {
-        setSortSelected(value);
-        const [field, dir] = value[0].split(' ');
-        setSortState({ field, direction: dir === 'desc' ? 'descending' : 'ascending' });
-        setCurrentPage(1);
-    }, []);
+    // ------------------------------------------------------------- rows ----
+    const renderActivity = (lock) => {
+        const notRunning = lock.status !== 'Active' || lock.scheduleState?.kind === 'scheduled';
+        if (lock.seen === 0) {
+            let note = 'No visitors yet';
+            if (lock.scheduleState?.kind === 'scheduled') note = `Starts ${lock.scheduleState.date}`;
+            else if (lock.scheduleState?.kind === 'expired') note = `Expired ${lock.scheduleState.date}`;
+            else if (notRunning) note = 'Not running';
+            return (
+                <div className="stack" style={{ gap: 3, minWidth: 118 }}>
+                    <span className="sm sub">&mdash;</span>
+                    <span className="xs sub">{note}</span>
+                </div>
+            );
+        }
+        const pct = Math.round((lock.unlocked / lock.seen) * 100);
+        return (
+            <div className="stack" style={{ gap: 5, minWidth: 118 }}>
+                <span className="sm"><strong>{lock.unlocked.toLocaleString()}</strong> unlocked</span>
+                <span className="act-bar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
+                <span className="xs sub">of {lock.seen.toLocaleString()} visitor{lock.seen !== 1 ? 's' : ''} &middot; {pct}%</span>
+            </div>
+        );
+    };
 
-    // Header clicks must also drive the sort dropdown, or it keeps advertising a
-    // sort the table is no longer using.
-    const handleSort = useCallback((columnIndex, direction) => {
-        const field = SORT_FIELD_BY_COLUMN[columnIndex];
-        if (!field) return;
-        setSortState({ field, direction });
-        setSortSelected([`${field} ${direction === 'descending' ? 'desc' : 'asc'}`]);
-        setCurrentPage(1);
-    }, []);
+    const colCount = hasActivity ? 8 : 7;
 
-    const filters = [{
-        key: 'status', label: 'Status',
-        filter: <ChoiceList title="Status" titleHidden choices={[{ label: 'Active', value: 'Active' }, { label: 'Inactive', value: 'Inactive' }]} selected={statusFilter} onChange={setStatusFilter} allowMultiple />,
-        shortcut: true,
-    }];
-
-    const tabs = [
-        { id: 'all', content: 'All', accessibilityLabel: 'All locks', panelID: 'all-locks' },
-        { id: 'Active', content: 'Active', accessibilityLabel: 'Active locks', panelID: 'active-locks' },
-        { id: 'Inactive', content: 'Inactive', accessibilityLabel: 'Inactive locks', panelID: 'inactive-locks' },
-    ];
-
-    // The tab is a view of the status filter, not a second source of truth for
-    // it. As separate state they drifted: clearing the "Status: Active" chip
-    // left the Active tab highlighted over a list showing everything, and
-    // choosing a status in the filter popover left the tab on All.
-    const selectedTabIndex = statusFilter.length === 1
-        ? Math.max(0, tabs.findIndex((t) => t.id === statusFilter[0]))
-        : 0;
-
-    const handleTabChange = useCallback((i) => {
-        setStatusFilter(tabs[i].id === 'all' ? [] : [tabs[i].id]);
-    }, []);
-
-    const appliedFilters = statusFilter.length > 0
-        ? [{ key: 'status', label: `Status: ${statusFilter.join(', ')}`, onRemove: () => setStatusFilter([]) }]
-        : [];
-
-    const rowMarkup = paginatedLocks.map((lock, index) => {
-        const actualIndex = (activePage - 1) * itemsPerPage + index;
+    const rowMarkup = paginatedLocks.map((lock) => {
         const isToggling = togglingStatusIds.has(lock.id);
-        // Two badges fit the column; the rest collapse into a "+N" with the
-        // full list in its tooltip.
+        const isActive = lock.status === 'Active';
+        // Two pills fit the column; the rest collapse into "+N" with the full
+        // list in its title.
         const shownTypes = lock.resourceTypes.slice(0, 2);
         const hiddenTypes = lock.resourceTypes.slice(2);
         const kindLabel = lockKindLabel(lock.type);
+        const checked = selectedResources.includes(lock.id);
 
         return (
-            <IndexTable.Row id={lock.id} key={lock.id} selected={selectedResources.includes(lock.id)} position={actualIndex}>
-                {/* Lock Name + description */}
-                <IndexTable.Cell>
-                    <BlockStack gap="050">
-                        <InlineStack gap="200" blockAlign="center">
-                            <Button variant="plain" textAlign="left" onClick={() => router.visit(`/lock/${lock.id}/configure`)}>
-                                <Text variant="bodyMd" fontWeight="semibold" as="span">{lock.name}</Text>
-                            </Button>
+            <tr key={lock.id}>
+                <td>
+                    <input type="checkbox" checked={checked} onChange={() => toggleOne(lock.id)} aria-label={`Select ${lock.name}`} />
+                </td>
+                <td>
+                    <div className="stack" style={{ gap: 3 }}>
+                        <span className="row g8 wrap">
+                            <button type="button" className="lock-name" onClick={() => router.visit(`/lock/${lock.id}/preview`)}>
+                                {lock.name}
+                            </button>
                             {lock.scheduleState?.kind === 'scheduled' && (
-                                <Badge tone="info">{`Scheduled for ${lock.scheduleState.date}`}</Badge>
+                                <span className="tag" title={`Scheduled for ${lock.scheduleState.full}`}>{`Scheduled ${lock.scheduleState.date}`}</span>
                             )}
                             {lock.scheduleState?.kind === 'expired' && (
-                                <Badge tone="critical">{`Expired on ${lock.scheduleState.date}`}</Badge>
+                                <span className="tag" style={{ background: 'var(--p-critical-bg)', color: 'var(--p-critical-fg)' }}>{`Expired ${lock.scheduleState.date}`}</span>
                             )}
-                        </InlineStack>
+                            <span className="xs sub">#{lock.id}</span>
+                        </span>
                         {lock.description && (
-                            <Text variant="bodySm" tone="subdued" as="span">
+                            <span className="xs sub" title={lock.description}>
                                 {lock.description.length > 60 ? lock.description.substring(0, 60) + '…' : lock.description}
-                            </Text>
+                            </span>
                         )}
-                        <Text variant="bodySm" tone="subdued" as="span">ID: {lock.id}</Text>
-                    </BlockStack>
-                </IndexTable.Cell>
-
-                {/* What the lock protects */}
-                <IndexTable.Cell>
-                    <BlockStack gap="100">
+                    </div>
+                </td>
+                <td>
+                    <div className="stack g4">
                         {shownTypes.length > 0 ? (
-                            <InlineStack gap="100" blockAlign="center">
+                            <div className="row g4">
                                 {shownTypes.map(({ type, count }) => (
-                                    <span key={type} style={resourceTypePillStyle(type)}>
-                                        {resourceTypeLabel(type, count)}
-                                    </span>
+                                    <span key={type} className={`pill ${type}`}>{resourceTypeLabel(type, count)}</span>
                                 ))}
                                 {hiddenTypes.length > 0 && (
-                                    <Tooltip
-                                        content={hiddenTypes
-                                            .map(({ type, count }) => resourceTypeLabel(type, count))
-                                            .join(', ')}
+                                    <span
+                                        className="pill neutral"
+                                        title={hiddenTypes.map(({ type, count }) => resourceTypeLabel(type, count)).join(', ')}
                                     >
-                                        <span
-                                            style={{
-                                                display: 'inline-block',
-                                                padding: '2px 8px',
-                                                borderRadius: '20px',
-                                                fontSize: '11px',
-                                                fontWeight: 600,
-                                                background: NEUTRAL_COLOR.bg,
-                                                color: NEUTRAL_COLOR.fg,
-                                            }}
-                                        >
-                                            {`+${hiddenTypes.length}`}
-                                        </span>
-                                    </Tooltip>
+                                        {`+${hiddenTypes.length}`}
+                                    </span>
                                 )}
-                            </InlineStack>
+                            </div>
                         ) : (
-                            <Text variant="bodySm" tone="subdued" as="span">No items</Text>
+                            <span className="xs sub">No items</span>
                         )}
-                        {kindLabel && (
-                            <Text variant="bodySm" tone="subdued" as="span">{kindLabel}</Text>
-                        )}
-                    </BlockStack>
-                </IndexTable.Cell>
-
-                {/* Items */}
-                <IndexTable.Cell>
-                    <InlineStack gap="100" blockAlign="center">
-                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: '#ede9fe', color: '#6d28d9', fontSize: 11, fontWeight: 700 }}>
-                            {lock.itemCount}
-                        </span>
-                        <Text variant="bodySm" tone="subdued">item{lock.itemCount !== 1 ? 's' : ''}</Text>
-                    </InlineStack>
-                </IndexTable.Cell>
-
-                {/* Created */}
-                <IndexTable.Cell>
-                    <BlockStack gap="0">
-                        <Text variant="bodySm" as="span">{lock.createdAt}</Text>
-                        <Text variant="bodySm" tone="subdued" as="span">Created</Text>
-                    </BlockStack>
-                </IndexTable.Cell>
-
-                {/* Last updated */}
-                <IndexTable.Cell>
-                    <BlockStack gap="0">
-                        <Text variant="bodySm" as="span">{lock.lastUpdated}</Text>
-                        <Text variant="bodySm" tone="subdued" as="span">Updated</Text>
-                    </BlockStack>
-                </IndexTable.Cell>
-
-                {/* Status knob */}
-                <IndexTable.Cell>
-                    <KnobToggle
-                        checked={lock.status === 'Active'}
-                        onChange={() => handleStatusToggle(lock)}
+                        {kindLabel && <span className="xs sub">{kindLabel}</span>}
+                    </div>
+                </td>
+                <td>
+                    <span className="row g8">
+                        <span className="count-chip">{lock.itemCount}</span>
+                        <span className="xs sub">item{lock.itemCount !== 1 ? 's' : ''}</span>
+                    </span>
+                </td>
+                {hasActivity && <td>{renderActivity(lock)}</td>}
+                <td>
+                    <div className="stack" style={{ gap: 2 }}>
+                        <span className="sm">{lock.lastUpdated}</span>
+                        <span className="xs sub">Updated &middot; created {lock.createdAt}</span>
+                    </div>
+                </td>
+                <td>
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isActive}
+                        aria-label={`${lock.name}: ${isActive ? 'Active' : 'Inactive'}`}
+                        title={isActive ? 'Active — click to deactivate' : 'Inactive — click to activate'}
+                        className={`knob${isActive ? '' : ' off'}`}
                         disabled={isToggling}
+                        onClick={() => handleStatusToggle(lock)}
                     />
-                </IndexTable.Cell>
-
-                {/* Actions */}
-                <IndexTable.Cell>
-                    <InlineStack gap="150" align="end" blockAlign="center">
-                        <Tooltip content="Edit lock">
-                            <Button
-                                size="slim"
-                                icon={EditIcon}
-                                onClick={() => router.visit(`/lock/${lock.id}/configure`)}
-                                accessibilityLabel={`Edit ${lock.name}`}
-                            >
-                                Edit
-                            </Button>
-                        </Tooltip>
-                        <Tooltip content="Preview lock">
-                            <Button
-                                size="slim"
-                                icon={ViewIcon}
-                                variant="secondary"
-                                onClick={() => router.visit(`/lock/${lock.id}/preview`)}
-                                accessibilityLabel={`Preview ${lock.name}`}
-                            />
-                        </Tooltip>
-                        <Tooltip content="Delete lock">
-                            <Button
-                                size="slim"
-                                tone="critical"
-                                variant="secondary"
-                                icon={DeleteIcon}
-                                onClick={() => openDeleteModal(lock)}
-                                accessibilityLabel={`Delete ${lock.name}`}
-                            />
-                        </Tooltip>
-                    </InlineStack>
-                </IndexTable.Cell>
-            </IndexTable.Row>
+                </td>
+                <td className="end">
+                    <span className="row g8" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                            type="button"
+                            className="btn icon"
+                            aria-label={`Edit ${lock.name}`}
+                            title="Edit lock"
+                            onClick={() => router.visit(`/lock/${lock.id}/configure`)}
+                        >
+                            <IcoEdit />
+                        </button>
+                        <button
+                            type="button"
+                            className="btn icon del"
+                            aria-label={`Delete ${lock.name}`}
+                            title="Delete lock"
+                            onClick={() => openDeleteModal(lock)}
+                        >
+                            <IcoDelete />
+                        </button>
+                    </span>
+                </td>
+            </tr>
         );
     });
 
+    const selCount = selectedResources.length;
+
     return (
-        <Page
-            title="Access Locks"
-            subtitle={`Secure products, collections, pages, and blogs with custom access rules. Trusted by ${storesCount}+ stores`}
-            primaryAction={{ content: 'Create New Lock', icon: PlusIcon, onAction: goToCreateLock, disabled: currentPlan?.limitReached }}
-        >
-            <style>{`
-                .dash-stat-card:hover {
-                    border-color: #c4b5fd !important;
-                    box-shadow: 0 8px 30px rgba(139,92,246,0.1) !important;
-                    transform: translateY(-2px);
-                }
-                .dash-banner-btn {
-                    position: relative; overflow: hidden;
-                    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-                }
-                .dash-banner-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(139,92,246,0.4); }
-                .dash-banner-btn:active { transform: translateY(0); }
-            `}</style>
+        <div className="airo pg-locks">
+            <main className="page full">
+                <div className="between wrap g12" style={{ marginBottom: 16 }}>
+                    <div>
+                        <h1 style={{ fontSize: 20, fontWeight: 650 }}>Locks</h1>
+                        <p className="sm sub mt4">
+                            Secure products, collections, pages and blogs with custom access rules.
+                            {storesCount ? ` Trusted by ${storesCount}+ stores.` : ''}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        className="btn primary"
+                        onClick={goToCreateLock}
+                        disabled={currentPlan?.limitReached}
+                    >
+                        &#43; Create new lock
+                    </button>
+                </div>
 
-            <BlockStack gap="500">
-                {/* Storefront app embed disabled — locks won't run until it's enabled.
-                    Shown as a sleek fixed corner notice (rendered below, outside the stack). */}
+                {/* Plan and usage: what you are on, how much of it is spent,
+                    and the way to change it. */}
+                {showPlan && (
+                    <div className={`plan${currentPlan.limitReached ? ' limit' : ''}`}>
+                        <span className="plan-badge" title={currentPlan.name}>
+                            {currentPlan.isTrial ? 'Trial' : currentPlan.name}
+                        </span>
+                        <div className="plan-who">
+                            <span className="plan-name">{planTitle}</span>
+                            <span className="plan-sub">{getBannerMessage()}</span>
+                        </div>
 
-                {/* Plan banner — trial countdown, limit warnings and active-plan status. */}
-                {currentPlan && !planBannerDismissed && (currentPlan.isTrial || currentPlan.limitReached || currentPlan.hasPaidPlan) && (
-                    <div style={{ borderRadius: 12, background: 'linear-gradient(135deg,#a78bfa,#8b5cf6,#7c3aed)', padding: '20px 24px', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 20px rgba(139,92,246,0.2)' }}>
-                        <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
-                        <div style={{ position: 'absolute', bottom: -20, right: 80, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1 }}>
-                                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                    {currentPlan.limitReached ? <Lock size={20} color="#8b5cf6" /> : <Crown size={20} color="#8b5cf6" />}
-                                </div>
-                                <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                        <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
-                                            {currentPlan.limitReached ? 'Lock Limit Reached' : currentPlan.hasPaidPlan && !currentPlan.isTrial ? `${currentPlan.name} Plan Active` : `${currentPlan.name} Plan`}
-                                        </span>
-                                        {currentPlan.hasPaidPlan && !currentPlan.isTrial && !currentPlan.limitReached && (
-                                            <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                <Sparkles size={9} /> Active
-                                            </span>
-                                        )}
+                        <div className="plan-meter">
+                            {limited ? (
+                                <>
+                                    <div className="between" style={{ marginBottom: 6 }}>
+                                        <span className="sm"><strong>{currentPlan.currentLocks} of {currentPlan.maxLocks}</strong> locks used</span>
+                                        <span className="xs sub">{currentPlan.remainingLocks ?? Math.max(0, currentPlan.maxLocks - currentPlan.currentLocks)} remaining</span>
                                     </div>
-                                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: '18px', maxWidth: 500, display: 'block' }}>{getBannerMessage()}</span>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                                {!(currentPlan.hasPaidPlan && !currentPlan.isTrial && !currentPlan.limitReached) && (
-                                    <button className="dash-banner-btn" onClick={() => router.visit('/pricing')} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#fff', color: '#8b5cf6', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        {currentPlan.hasPaidPlan ? 'View Plans' : 'Upgrade Plan'}
-                                        <ArrowUpRight size={13} />
-                                    </button>
-                                )}
-                                <button onClick={() => setPlanBannerDismissed(true)} onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; }} onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontFamily: 'inherit', transition: 'all 0.2s ease' }}>✕</button>
-                            </div>
+                                    <div className="plan-bar"><i style={{ width: `${usedPct}%` }} /></div>
+                                </>
+                            ) : (
+                                <span className="sm"><strong>{plural(currentPlan.currentLocks ?? locks.length, 'lock')}</strong> &middot; unlimited on this plan</span>
+                            )}
+                        </div>
+
+                        <div className="row g8">
+                            <button type="button" className="btn go" onClick={() => router.visit('/pricing')}>
+                                {paidAndActive || currentPlan.hasPaidPlan ? 'View plans' : 'Upgrade plan'}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn plain icon plan-x"
+                                aria-label="Dismiss plan summary"
+                                onClick={() => setPlanBannerDismissed(true)}
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                            </button>
                         </div>
                     </div>
                 )}
 
-                {/* Stat cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                    {[
-                        { icon: Lock, label: 'Total Locks', value: locks.length, subtitle: !currentPlan ? `${locks.length} content lock${locks.length !== 1 ? 's' : ''}` : currentPlan.limitReached ? `Limit reached (${currentPlan.maxLocks} max)` : currentPlan.hasUnlimitedLocks ? 'Unlimited locks' : `${currentPlan.remainingLocks} remaining` },
-                        { icon: CheckCircle, label: 'Active Locks', value: activeCount, subtitle: activeCount === 0 ? 'No active locks' : locks.length > 0 ? `${((activeCount / locks.length) * 100).toFixed(0)}% of total` : '0% of total' },
-                        { icon: EyeOff, label: 'Inactive Locks', value: inactiveCount, subtitle: inactiveCount === 0 ? 'All locks active' : 'Ready to activate' },
-                        { icon: ShieldCheck, label: 'Items Secured', value: totalItems, subtitle: totalItems === 0 ? 'No items protected' : `Across ${locks.length} lock${locks.length !== 1 ? 's' : ''}` },
-                    ].map((card, i) => (
-                        <div key={i} className="dash-stat-card" style={{ borderRadius: 12, background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14, transition: 'all 0.25s ease' }}>
-                            <div style={{ width: 42, height: 42, borderRadius: 10, background: '#f3f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                <card.icon size={20} color="#8b5cf6" />
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block' }}>{card.label}</span>
-                                <span style={{ fontSize: 24, fontWeight: 700, color: '#111827', display: 'block', lineHeight: '28px' }}>{card.value}</span>
-                                <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.subtitle}</span>
+                {/* One summary, divided — every figure is the table counted. */}
+                <div className={`stat-row${hasActivity ? '' : ' three'}`}>
+                    <div className="stat">
+                        <span className="stat-ico good"><IcoActive /></span>
+                        <div className="grow">
+                            <span className="stat-v">{activeCount}</span>
+                            <span className="stat-l">Active locks</span>
+                            <span className="stat-note">Running on your storefront now</span>
+                        </div>
+                    </div>
+                    <div className="stat">
+                        <span className="stat-ico warn"><IcoInactive /></span>
+                        <div className="grow">
+                            <span className="stat-v">{inactiveCount}</span>
+                            <span className="stat-l">Inactive locks</span>
+                            <span className="stat-note">Saved, not enforcing anything</span>
+                        </div>
+                    </div>
+                    {hasActivity && (
+                        <div className="stat">
+                            <span className="stat-ico info"><IcoUnlocked /></span>
+                            <div className="grow">
+                                <span className="stat-v">{totalUnlocked.toLocaleString()}</span>
+                                <span className="stat-l">Unlocked</span>
+                                <span className="stat-note">Of {totalSeen.toLocaleString()} visitors stopped &middot; 30 days</span>
                             </div>
                         </div>
-                    ))}
+                    )}
+                    <div className="stat">
+                        <span className="stat-ico brand"><IcoShield /></span>
+                        <div className="grow">
+                            <span className="stat-v">{totalItems}</span>
+                            <span className="stat-l">Items secured</span>
+                            <span className="stat-note">Products, pages and collections</span>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Table */}
-                <div style={{ marginBottom: 15 }}>
-                    <Card padding="0">
-                        <IndexFilters
-                            sortOptions={sortOptions}
-                            sortSelected={sortSelected}
-                            queryValue={queryValue}
-                            queryPlaceholder="Search locks…"
-                            onQueryChange={setQueryValue}
-                            onQueryClear={() => setQueryValue('')}
-                            onSort={handleSortChange}
-                            cancelAction={{ onAction: () => setMode('default'), disabled: false, loading: false }}
-                            tabs={tabs}
-                            selected={selectedTabIndex}
-                            onSelect={handleTabChange}
-                            canCreateNewView={false}
-                            filters={filters}
-                            appliedFilters={appliedFilters}
-                            onClearAll={() => { setQueryValue(''); setStatusFilter([]); setMode('default'); }}
-                            mode={mode}
-                            setMode={setMode}
-                        />
+                <div className="card mt16" style={{ padding: 0, overflow: 'hidden', marginTop: 16 }}>
+                    {locks.length === 0 ? (
+                        <div className="empty">
+                            <img src="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png" alt="" />
+                            <div className="h-md mt12">No locks yet</div>
+                            <p className="sm sub mt4" style={{ maxWidth: 420, margin: '4px auto 0' }}>
+                                {currentPlan?.limitReached
+                                    ? `You've reached the ${currentPlan.maxLocks}-lock limit of the ${currentPlan.name} plan. Upgrade to create more locks.`
+                                    : 'Get started by creating your first content lock to secure exclusive content.'}
+                            </p>
+                            {currentPlan?.limitReached ? (
+                                <button type="button" className="btn primary mt12" style={{ marginTop: 12 }} onClick={() => router.visit('/pricing')}>Upgrade plan</button>
+                            ) : (
+                                <button type="button" className="btn primary mt12" style={{ marginTop: 12 }} onClick={goToCreateLock}>Create your first lock</button>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            {selCount > 0 ? (
+                                <div className="bulk">
+                                    <span className="strong">{selCount} selected</span>
+                                    <div className="row g8 wrap" style={{ marginLeft: 'auto' }}>
+                                        <button type="button" className="btn" onClick={handleBulkActivate}>Activate</button>
+                                        <button type="button" className="btn" onClick={handleBulkDeactivate}>Deactivate</button>
+                                        <button type="button" className="btn danger" onClick={openBulkDeleteModal}>Delete</button>
+                                        <button type="button" className="btn plain" onClick={clearSelection}>Clear</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="filters">
+                                    <div className="tabs" role="tablist">
+                                        {TABS.map((t) => (
+                                            <button
+                                                key={t.id}
+                                                type="button"
+                                                role="tab"
+                                                aria-selected={tab === t.id}
+                                                className={`tab${tab === t.id ? ' on' : ''}`}
+                                                onClick={() => setTab(t.id)}
+                                            >
+                                                {t.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="searchbar">
+                                        <IcoSearch />
+                                        <input
+                                            type="search"
+                                            placeholder="Search locks…"
+                                            aria-label="Search locks"
+                                            value={queryValue}
+                                            onChange={(e) => setQueryValue(e.target.value)}
+                                        />
+                                    </div>
+                                    <select
+                                        className="select"
+                                        aria-label="Sort locks"
+                                        value={sortKey}
+                                        onChange={(e) => setSortKey(e.target.value)}
+                                    >
+                                        <option value="updated">Recently updated</option>
+                                        <option value="name">Name A&ndash;Z</option>
+                                        {hasActivity && <option value="activity">Most activity</option>}
+                                        <option value="items">Most items</option>
+                                    </select>
+                                </div>
+                            )}
 
-                        {filteredLocks.length > 0 ? (
-                            <>
-                                <IndexTable
-                                    resourceName={{ singular: 'content lock', plural: 'content locks' }}
-                                    itemCount={filteredLocks.length}
-                                    selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
-                                    onSelectionChange={handleSelectionChange}
-                                    headings={[
-                                        { title: 'Lock Name' },
-                                        { title: 'Type' },
-                                        { title: 'Items' },
-                                        { title: 'Created' },
-                                        { title: 'Last Updated' },
-                                        { title: 'Status' },
-                                        { title: 'Actions', alignment: 'end' },
-                                    ]}
-                                    promotedBulkActions={promotedBulkActions}
-                                    bulkActions={bulkActions}
-                                    sortable={[true, false, true, false, false, true, false]}
-                                    sortDirection={sortState.direction}
-                                    sortColumnIndex={SORT_COLUMN_BY_FIELD[sortState.field]}
-                                    onSort={handleSort}
-                                >
-                                    {rowMarkup}
-                                </IndexTable>
+                            <div className="t-scroll">
+                                <table className="idx">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: 26 }}>
+                                                <input
+                                                    ref={selectAllRef}
+                                                    type="checkbox"
+                                                    aria-label="Select all locks on this page"
+                                                    checked={allOnPage}
+                                                    disabled={visibleIds.length === 0}
+                                                    onChange={toggleAll}
+                                                />
+                                            </th>
+                                            <th>Lock name</th>
+                                            <th>Type</th>
+                                            <th>Items</th>
+                                            {hasActivity && <th>Activity <span className="th-note">30 days</span></th>}
+                                            <th>Dates</th>
+                                            <th>Status</th>
+                                            <th className="end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {rowMarkup}
+                                        {filteredLocks.length === 0 && (
+                                            <tr className="t-none">
+                                                <td colSpan={colCount}>
+                                                    <span className="strong">No locks match that</span>
+                                                    <p className="sm sub mt4">Try a different word, or show all locks.</p>
+                                                    <button type="button" className="btn mt12" style={{ marginTop: 12 }} onClick={clearFilters}>Clear filters</button>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
 
-                                {filteredLocks.length > itemsPerPage && (
-                                    <Box padding="400">
-                                        <InlineStack align="center">
-                                            <Pagination
-                                                hasPrevious={activePage > 1}
-                                                hasNext={activePage < totalPages}
-                                                onPrevious={() => setCurrentPage(activePage - 1)}
-                                                onNext={() => setCurrentPage(activePage + 1)}
-                                                label={`${activePage} of ${totalPages}`}
-                                            />
-                                        </InlineStack>
-                                    </Box>
-                                )}
-                            </>
-                        ) : (
-                            <EmptyState
-                                heading="No locks found"
-                                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                                action={
-                                    currentPlan?.limitReached
-                                        ? { content: 'Upgrade plan', onAction: () => router.visit('/pricing') }
-                                        : { content: 'Create your first lock', onAction: goToCreateLock }
-                                }
-                            >
-                                <Text tone="subdued">
-                                    {currentPlan?.limitReached
-                                        ? `You've reached the ${currentPlan.maxLocks}-lock limit of the ${currentPlan.name} plan. Upgrade to create more locks.`
-                                        : queryValue || statusFilter.length > 0
-                                          ? "Try adjusting your search or filter to find what you're looking for."
-                                          : 'Get started by creating your first content lock to secure exclusive content.'}
-                                </Text>
-                            </EmptyState>
-                        )}
-                    </Card>
+                            {filteredLocks.length > itemsPerPage && (
+                                <div className="pager">
+                                    <button
+                                        type="button"
+                                        className="btn icon"
+                                        aria-label="Previous page"
+                                        disabled={activePage <= 1}
+                                        onClick={() => { clearSelection(); setCurrentPage(activePage - 1); }}
+                                    >
+                                        &lsaquo;
+                                    </button>
+                                    <span className="sm sub">{activePage} of {totalPages}</span>
+                                    <button
+                                        type="button"
+                                        className="btn icon"
+                                        aria-label="Next page"
+                                        disabled={activePage >= totalPages}
+                                        onClick={() => { clearSelection(); setCurrentPage(activePage + 1); }}
+                                    >
+                                        &rsaquo;
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
-            </BlockStack>
+            </main>
 
-            {/* Delete modal */}
+            {/* Delete confirmation */}
             <Modal
                 open={deleteModalOpen}
                 onClose={closeDeleteModal}
@@ -770,6 +762,6 @@ export default function Dashboard() {
                     <Text>{deleteModalContent.message}</Text>
                 </Modal.Section>
             </Modal>
-        </Page>
+        </div>
     );
 }

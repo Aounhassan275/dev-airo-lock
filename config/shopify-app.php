@@ -172,7 +172,7 @@ return [
     |
     */
 
-    'api_version' => env('SHOPIFY_API_VERSION', '2025-01'),
+    'api_version' => env('SHOPIFY_API_VERSION', '2026-10'),
 
     /*
     |--------------------------------------------------------------------------
